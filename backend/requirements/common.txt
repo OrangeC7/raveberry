@@ -13,3 +13,4 @@ qrcode>=6.1
 raveberry-mopidyapi>=1.0.0
 redis>=3.5.3
 requests>=2.22.0
+python-vlc
