@@ -49,8 +49,13 @@ REM ---------- Validators ----------
 :is_abs_path
 set "_check=%~1"
 if not defined _check exit /b 1
-echo(%_check%| findstr /R /C:"^[A-Za-z]:\\" >nul && exit /b 0
+
+REM Drive-letter absolute path, e.g. C:\something
+if "%_check:~1,1%"==":" if "%_check:~2,1%"=="\" exit /b 0
+
+REM UNC path, e.g. \\server\share
 if "%_check:~0,2%"=="\\" exit /b 0
+
 exit /b 1
 
 :is_valid_port
@@ -278,7 +283,6 @@ if not "%FIELDNUM%"=="1" if not "%FIELDNUM%"=="2" if not "%FIELDNUM%"=="3" if no
 )
 
 goto :edit_loop_top
-)
 
 call :warn "Unknown option."
 goto :edit_loop_top
