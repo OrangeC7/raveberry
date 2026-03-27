@@ -444,7 +444,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-python -m pip install --force-reinstall "raveberry[install] @ git+%DEFAULT_RAVEBERRY_REPO%@%DEFAULT_RAVEBERRY_REF%"
+python -m pip install --force-reinstall "raveberry[run] @ git+%DEFAULT_RAVEBERRY_REPO%@%DEFAULT_RAVEBERRY_REF%"
 if errorlevel 1 (
     call :die "Failed to install raveberry from the GitHub repository."
     exit /b 1
@@ -472,10 +472,10 @@ if errorlevel 1 (
 call :write_config_file
 if errorlevel 1 exit /b 1
 
-call :log "[6/6] Running installer"
-python "%RAVEBERRY_SCRIPT%" --config-file "%CONFIG_PATH%" install
+call :log "[6/6] Starting local Raveberry server"
+python "%RAVEBERRY_SCRIPT%" run --nomopidy
 if errorlevel 1 (
-    call :die "raveberry install failed."
+    call :die "raveberry run failed."
     exit /b 1
 )
 
