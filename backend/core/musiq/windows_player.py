@@ -2,16 +2,40 @@
 
 from __future__ import annotations
 
+import os
 import time
+from pathlib import Path
 from typing import Optional
 
 from core import redis
 from core.musiq import player
 from core.musiq.playback import PlaybackError
 
+
+def _find_vlc_dir() -> Optional[Path]:
+    if os.name != "nt":
+        return None
+
+    candidates = [
+        Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "VideoLAN" / "VLC",
+        Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")) / "VideoLAN" / "VLC",
+    ]
+
+    for candidate in candidates:
+        if (candidate / "libvlc.dll").exists():
+            os.environ["PATH"] = str(candidate) + os.pathsep + os.environ.get("PATH", "")
+            if hasattr(os, "add_dll_directory"):
+                os.add_dll_directory(str(candidate))
+            return candidate
+
+    return None
+
+
+_VLC_DIR = _find_vlc_dir()
+
 try:
     import vlc  # python-vlc
-except ImportError:  # handled at runtime
+except ImportError:
     vlc = None
 
 
@@ -30,7 +54,10 @@ class WindowsPlayer(player.Player):
         if vlc is None:
             raise PlaybackError("python-vlc is not installed")
 
-        self.instance = vlc.Instance()
+        args = []
+        if _VLC_DIR is not None and (_VLC_DIR / "plugins").exists():
+            args.append(f"--plugin-path={_VLC_DIR / 'plugins'}")
+        self.instance = vlc.Instance(*args)
         self.media_player = self.instance.media_player_new()
 
     def _set_media(self, uri: str) -> None:
