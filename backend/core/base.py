@@ -12,7 +12,7 @@ from django.shortcuts import render
 from django.urls import reverse
 
 from django.conf import settings as conf
-from core import models, redis, user_manager
+from core import models, redis, site_mode, user_manager
 from core.lights import controller
 from core.musiq import musiq
 from core.settings import storage
@@ -78,7 +78,6 @@ def context(request: WSGIRequest) -> Dict[str, Any]:
         "hashtag": _get_random_hashtag(),
         "demo": conf.DEMO,
         "controls_enabled": user_manager.has_controls(request.user)
-        or user_manager.has_secret_controls(request)
         or storage.get("interactivity") == storage.Interactivity.full_control,
         "is_admin": user_manager.is_admin(request.user),
         "apk_link": _get_apk_link(),
@@ -114,6 +113,19 @@ def landing(request: WSGIRequest) -> HttpResponse:
     """Renders the static page with the embedded player iframe."""
     return render(request, "landing.html")
 
+def afterhours(_request: WSGIRequest) -> HttpResponse:
+    """Renders the FURATIC After Hours page."""
+    return render(_request, "landing_afterhours.html")
+
+
+def site_mode_status(_request: WSGIRequest) -> HttpResponse:
+    """Returns the current runtime-only public site mode."""
+    return JsonResponse({"mode": site_mode.get_mode()})
+
+def settings_disabled(_request: WSGIRequest) -> HttpResponse:
+    """Disable the broken settings page and send admins to Django admin instead."""
+    return HttpResponseRedirect("/admin/")
+
 def no_stream(request: WSGIRequest) -> HttpResponse:
     """Renders the /stream page. If this is reached, there is no stream active."""
     return render(request, "no_stream.html", context(request))
@@ -134,10 +146,10 @@ def submit_hashtag(request: WSGIRequest) -> HttpResponse:
 
 def logged_in(request: WSGIRequest) -> HttpResponse:
     """This endpoint is visited after every login.
-    Redirect the admin to the settings and everybody else to the musiq page."""
+    Redirect the admin to Django admin and everybody else to the public page."""
     if user_manager.is_admin(request.user):
-        return HttpResponseRedirect(reverse("settings"))
-    return HttpResponseRedirect(reverse("musiq"))
+        return HttpResponseRedirect("/admin/")
+    return HttpResponseRedirect(reverse("base"))
 
 
 def set_user_color(request: WSGIRequest) -> None:
