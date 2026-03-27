@@ -30,10 +30,10 @@ def control(func: Callable) -> Callable:
     At least mod privilege is required during voting."""
 
     def _decorator(request: WSGIRequest) -> HttpResponse:
-        if storage.get(
-            "interactivity"
-        ) != storage.Interactivity.full_control and not user_manager.has_controls(
-            request.user
+        if (
+            storage.get("interactivity") != storage.Interactivity.full_control
+            and not user_manager.has_controls(request.user)
+            and not user_manager.has_secret_controls(request)
         ):
             return HttpResponseForbidden()
         response = func(request)
