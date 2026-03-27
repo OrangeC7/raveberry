@@ -1,4 +1,6 @@
 """This module contains all url endpoints and maps them to their corresponding functions."""
+import os
+import secrets
 import inspect
 from typing import Any, List, Union
 
@@ -24,9 +26,16 @@ from core.settings import system
 from core.settings import wifi
 from core import state_handler
 
+_admin_route = os.environ.get("RAVEBERRY_ADMIN_ROUTE")
+if not _admin_route:
+    token = secrets.token_urlsafe(12).replace("-", "").replace("_", "")[:16]
+    _admin_route = f"admin-{token}/"
+print(f"[Raveberry] Admin player URL: /{_admin_route}")
+
 urlpatterns: List[Union[URLPattern, URLResolver]] = [
     path("", base.landing, name="base"),
     path("p/", musiq.embed, name="musiq"),
+    path(_admin_route, musiq.index, name="musiq-admin"),
     path("musiq/", RedirectView.as_view(pattern_name="base", permanent=False)),
     path("lights/", lights.index, name="lights"),
     path("stream/", base.no_stream, name="no-stream"),
