@@ -1,6 +1,4 @@
 """This module contains all url endpoints and maps them to their corresponding functions."""
-import os
-import secrets
 import inspect
 from typing import Any, List, Union
 
@@ -26,28 +24,15 @@ from core.settings import system
 from core.settings import wifi
 from core import state_handler
 
-ADMIN_ROUTE = os.environ.get("RAVEBERRY_ADMIN_ROUTE")
-if not ADMIN_ROUTE:
-    token = secrets.token_urlsafe(12).replace("-", "").replace("_", "")[:16]
-    ADMIN_ROUTE = f"admin-{token}/"
-
-ADMIN_HOST = os.environ.get("RAVEBERRY_ADMIN_HOST", "127.0.0.1")
-ADMIN_PORT = os.environ.get("RAVEBERRY_ADMIN_PORT", "8080")
-
-print("\n" + "=" * 78)
-print(" RAVEBERRY ADMIN LINK (FULL CONTROL)")
-print(f" http://{ADMIN_HOST}:{ADMIN_PORT}/{ADMIN_ROUTE}")
-print("=" * 78 + "\n")
-
 urlpatterns: List[Union[URLPattern, URLResolver]] = [
     path("", base.landing, name="base"),
+    path("afterhours/", base.afterhours, name="afterhours"),
     path("p/", musiq.embed, name="musiq"),
-    path(ADMIN_ROUTE, musiq.index, name="musiq-admin"),
     path("musiq/", RedirectView.as_view(pattern_name="base", permanent=False)),
     path("lights/", lights.index, name="lights"),
     path("stream/", base.no_stream, name="no-stream"),
     path("network-info/", network_info.index, name="network-info"),
-    path("settings/", settings.index, name="settings"),
+    path("settings/", base.settings_disabled, name="settings"),
     path("accounts/", include("django.contrib.auth.urls")),
     path("login/", RedirectView.as_view(pattern_name="login", permanent=False)),
     path("logged-in/", base.logged_in, name="logged-in"),
@@ -57,6 +42,7 @@ urlpatterns: List[Union[URLPattern, URLResolver]] = [
         include(
             [
                 path("version/", api.version, name="version"),
+                path("site-mode/", base.site_mode_status, name="site-mode-status"),
                 path(
                     "musiq/",
                     include(
@@ -132,13 +118,6 @@ urlpatterns.append(
                     name="lights-state",
                 ),
                 path("lights/", include(lights_paths)),
-                path(
-                    "settings/state/",
-                    state_handler.get_state,
-                    {"module": settings},
-                    name="settings-state",
-                ),
-                path("settings/", include(settings_paths)),
             ]
         ),
     )
