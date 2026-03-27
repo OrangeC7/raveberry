@@ -28,9 +28,10 @@ class Metadata(TypedDict, total=False):
 def get_path(basename: str) -> str:
     """Returns the absolute path for a basename of a file in the cache directory."""
     path = os.path.join(conf.SONGS_CACHE_DIR, basename)
-    path = path.replace("~", os.environ["HOME"])
-    path = os.path.abspath(path)
-    return path
+    home = os.environ.get("HOME") or os.environ.get("USERPROFILE") or os.path.expanduser("~")
+    path = path.replace("~", home)
+    path = os.path.expanduser(path)
+    return os.path.abspath(path)
 
 
 def determine_url_type(url: str) -> str:
