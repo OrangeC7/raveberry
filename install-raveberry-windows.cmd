@@ -1,5 +1,5 @@
 @echo off
-setlocal EnableExtensions EnableDelayedExpansion
+setlocal EnableExtensions
 
 REM ====================================================================
 REM Raveberry Interactive Installer for Windows 11, runs on localhost.
@@ -172,7 +172,8 @@ exit /b 0
 
 :ensure_expected_conda_environment
 call :log "[1/6] Checking active Conda environment"
-call :ensure_any_conda_environment || exit /b 1
+call :ensure_any_conda_environment
+if errorlevel 1 exit /b 1
 
 echo Current active Conda environment = %CONDA_DEFAULT_ENV%
 echo Current CONDA_PREFIX            = %CONDA_PREFIX%
@@ -244,6 +245,7 @@ if not defined ACTION set "ACTION=C"
 
 if /I "%ACTION%"=="C" exit /b 0
 if /I "%ACTION%"=="CONTINUE" exit /b 0
+
 if /I "%ACTION%"=="Q" (
     call :die "User aborted."
     exit /b 1
@@ -253,25 +255,29 @@ if /I "%ACTION%"=="QUIT" (
     exit /b 1
 )
 
-if /I "%ACTION%"=="E" (
-    set "FIELDNUM="
-    set /p "FIELDNUM=Enter field number to edit (1-9): "
-
-    if "%FIELDNUM%"=="1" call :ask_text EXPECTED_CONDA_ENV "Expected active Conda environment name for Raveberry" "%EXPECTED_CONDA_ENV%"
-    if "%FIELDNUM%"=="2" call :warn "CURRENT_CONDA_ENV is read-only. Activate a different Conda env outside this script, then rerun."
-    if "%FIELDNUM%"=="3" call :ask_text CONFIG_PATH "Path to write raveberry.yaml" "%CONFIG_PATH%"
-    if "%FIELDNUM%"=="4" call :ask_text INSTALL_DIR "Raveberry install_directory" "%INSTALL_DIR%" is_abs_path
-    if "%FIELDNUM%"=="5" call :ask_text HOSTNAME_VALUE "Hostname for Raveberry" "%HOSTNAME_VALUE%"
-    if "%FIELDNUM%"=="6" call :ask_text PORT_VALUE "Web port" "%PORT_VALUE%" is_valid_port
-    if "%FIELDNUM%"=="7" call :ask_bool YOUTUBE "Enable YouTube support?" "%YOUTUBE%"
-    if "%FIELDNUM%"=="8" call :ask_bool SPOTIFY "Enable Spotify support?" "%SPOTIFY%"
-    if "%FIELDNUM%"=="9" call :ask_bool SOUNDCLOUD "Enable SoundCloud support?" "%SOUNDCLOUD%"
-
-    if not "%FIELDNUM%"=="1" if not "%FIELDNUM%"=="2" if not "%FIELDNUM%"=="3" if not "%FIELDNUM%"=="4" if not "%FIELDNUM%"=="5" if not "%FIELDNUM%"=="6" if not "%FIELDNUM%"=="7" if not "%FIELDNUM%"=="8" if not "%FIELDNUM%"=="9" (
-        call :warn "Invalid field number."
-    )
-
+if /I not "%ACTION%"=="E" if /I not "%ACTION%"=="EDIT" (
+    call :warn "Unknown option."
     goto :edit_loop_top
+)
+
+set "FIELDNUM="
+set /p "FIELDNUM=Enter field number to edit (1-9): "
+
+if "%FIELDNUM%"=="1" call :ask_text EXPECTED_CONDA_ENV "Expected active Conda environment name for Raveberry" "%EXPECTED_CONDA_ENV%"
+if "%FIELDNUM%"=="2" call :warn "CURRENT_CONDA_ENV is read-only. Activate a different Conda env outside this script, then rerun."
+if "%FIELDNUM%"=="3" call :ask_text CONFIG_PATH "Path to write raveberry.yaml" "%CONFIG_PATH%"
+if "%FIELDNUM%"=="4" call :ask_text INSTALL_DIR "Raveberry install_directory" "%INSTALL_DIR%" is_abs_path
+if "%FIELDNUM%"=="5" call :ask_text HOSTNAME_VALUE "Hostname for Raveberry" "%HOSTNAME_VALUE%"
+if "%FIELDNUM%"=="6" call :ask_text PORT_VALUE "Web port" "%PORT_VALUE%" is_valid_port
+if "%FIELDNUM%"=="7" call :ask_bool YOUTUBE "Enable YouTube support?" "%YOUTUBE%"
+if "%FIELDNUM%"=="8" call :ask_bool SPOTIFY "Enable Spotify support?" "%SPOTIFY%"
+if "%FIELDNUM%"=="9" call :ask_bool SOUNDCLOUD "Enable SoundCloud support?" "%SOUNDCLOUD%"
+
+if not "%FIELDNUM%"=="1" if not "%FIELDNUM%"=="2" if not "%FIELDNUM%"=="3" if not "%FIELDNUM%"=="4" if not "%FIELDNUM%"=="5" if not "%FIELDNUM%"=="6" if not "%FIELDNUM%"=="7" if not "%FIELDNUM%"=="8" if not "%FIELDNUM%"=="9" (
+    call :warn "Invalid field number."
+)
+
+goto :edit_loop_top
 )
 
 call :warn "Unknown option."
@@ -373,10 +379,12 @@ exit /b 0
 
 REM ---------- Install steps ----------
 :run_install
-call :ensure_expected_conda_environment || exit /b 1
+call :ensure_expected_conda_environment
+if errorlevel 1 exit /b 1
 
 call :log "[2/6] Installing prerequisites"
-call :ensure_git || exit /b 1
+call :ensure_git
+if errorlevel 1 exit /b 1
 
 call :log "[3/6] Using active Conda environment"
 python --version
@@ -422,7 +430,8 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call :write_config_file || exit /b 1
+call :write_config_file
+if errorlevel 1 exit /b 1
 
 call :log "[6/6] Running installer"
 raveberry --config-file "%CONFIG_PATH%" install
@@ -436,8 +445,16 @@ exit /b 0
 
 REM ---------- Main ----------
 :main
-call :ensure_any_conda_environment || exit /b 1
-call :collect_answers || exit /b 1
-call :edit_loop || exit /b 1
-call :run_install || exit /b 1
+call :ensure_any_conda_environment
+if errorlevel 1 exit /b 1
+
+call :collect_answers
+if errorlevel 1 exit /b 1
+
+call :edit_loop
+if errorlevel 1 exit /b 1
+
+call :run_install
+if errorlevel 1 exit /b 1
+
 exit /b 0
