@@ -359,6 +359,66 @@ if errorlevel 1 (
 echo Found git in PATH.
 exit /b 0
 
+:ensure_ffmpeg
+set "ENV_FFMPEG=%CONDA_PREFIX%\Library\bin\ffmpeg.exe"
+
+if exist "%ENV_FFMPEG%" (
+    set "PATH=%CONDA_PREFIX%\Library\bin;%PATH%"
+    "%ENV_FFMPEG%" -version >nul 2>&1
+    if errorlevel 1 (
+        call :die "ffmpeg.exe exists in the active Conda environment, but it failed to execute."
+        exit /b 1
+    )
+    echo Found ffmpeg in the active Conda environment.
+    exit /b 0
+)
+
+call :warn "ffmpeg was not found in the active Conda environment."
+
+where conda >nul 2>&1
+if errorlevel 1 (
+    call :die "conda command not found in this shell. Open the Conda CMD terminal for the env and rerun."
+    exit /b 1
+)
+
+call :log "Previewing safe FFmpeg install into the active Conda environment"
+echo DO NOT press Ctrl+C during Conda transactions.
+call conda install -p "%CONDA_PREFIX%" -c conda-forge --strict-channel-priority --freeze-installed ffmpeg --dry-run
+if errorlevel 1 (
+    call :die "Safe FFmpeg dry-run failed. Refusing to modify the active Conda environment automatically."
+    exit /b 1
+)
+
+call :log "Installing ffmpeg into the active Conda environment"
+echo DO NOT press Ctrl+C during Conda transactions.
+call conda install -p "%CONDA_PREFIX%" -c conda-forge --strict-channel-priority --freeze-installed ffmpeg -y
+if errorlevel 1 (
+    call :die "Failed to install ffmpeg with conda."
+    exit /b 1
+)
+
+set "PATH=%CONDA_PREFIX%\Library\bin;%PATH%"
+
+if not exist "%ENV_FFMPEG%" (
+    call :die "ffmpeg.exe was not found at %ENV_FFMPEG% after Conda install."
+    exit /b 1
+)
+
+"%ENV_FFMPEG%" -version >nul 2>&1
+if errorlevel 1 (
+    call :die "ffmpeg was installed but failed to execute."
+    exit /b 1
+)
+
+where ffmpeg >nul 2>&1
+if errorlevel 1 (
+    call :die "ffmpeg still was not found in PATH after Conda install."
+    exit /b 1
+)
+
+echo Found ffmpeg in PATH.
+exit /b 0
+
 :write_config_file
 call :log "[5/6] Writing config to %CONFIG_PATH%"
 
@@ -418,6 +478,8 @@ exit /b 0
 REM ---------- Install steps ----------
 :run_install
 call :ensure_expected_conda_environment
+if errorlevel 1 exit /b 1
+call :ensure_ffmpeg
 if errorlevel 1 exit /b 1
 
 call :log "[2/8] Installing prerequisites"
