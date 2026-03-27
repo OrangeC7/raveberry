@@ -76,7 +76,7 @@ echo(%_port%| findstr /R "^[0-9][0-9]*$" >nul || exit /b 1
 if errorlevel 1 exit /b 1
 if %_portnum% lss 1 exit /b 1
 if %_portnum% gtr 65535 exit /b 1
-exit /b 1
+exit /b 0
 
 :normalize_bool
 set "RETVAL="
