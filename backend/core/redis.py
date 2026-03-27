@@ -51,6 +51,7 @@ defaults = {
     "library_scan_progress": "0 / 0 / 0",
     "bluetoothctl_active": False,
     "bluetooth_devices": [],
+    "site_mode": "event",
     # user manager
     "active_requests": 0,
     "last_user_count_update": 0.0,
