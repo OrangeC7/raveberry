@@ -34,6 +34,9 @@ def is_admin(user) -> bool:
     """Determines whether the given user is the admin."""
     return user.is_superuser
 
+def has_secret_controls(request: WSGIRequest) -> bool:
+    """Determines whether this session was unlocked via the secret full-control route."""
+    return bool(getattr(request, "session", None) and request.session.get("secret_controls"))
 
 def has_privilege(user, privilege: Privileges):
     if privilege == Privileges.everybody:
