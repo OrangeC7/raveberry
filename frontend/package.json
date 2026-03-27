@@ -39,7 +39,7 @@
   },
   "scripts": {
     "js": "rm -f ../backend/static/bundle.js && tsc && webpack --mode production && cp dist/bundle.js ../backend/static/",
-    "css": "sass scss/style.scss dist/style.full.css && purgecss -c purgecss.config.js --css dist/style.full.css -o dist/style.purged.css && postcss dist/style.purged.css > dist/style.css && cp dist/style.css ../backend/static/",
+    "css": "sass --load-path=node_modules scss/style.scss dist/style.full.css && purgecss -c purgecss.config.js --css dist/style.full.css -o dist/style.purged.css && postcss dist/style.purged.css > dist/style.css && cp dist/style.css ../backend/static/",
     "fonts": "./subtype.sh && cp dist/*.woff2 ../backend/static/",
     "watch-js": "rm -f ../backend/static/bundle.js && mkdir -p dist && touch dist/bundle.js && ln dist/bundle.js ../backend/static/bundle.js && tsc --watch & webpack --mode development --no-devtool --watch",
     "watch-css": "sass --watch scss/style.scss ../backend/static/style.css",
