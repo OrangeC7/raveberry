@@ -450,15 +450,16 @@ if errorlevel 1 (
     exit /b 1
 )
 
-where raveberry >nul 2>&1
-if errorlevel 1 (
-    call :die "raveberry command was not found after install. Make sure this CMD session is running inside the active Conda env."
+set "RAVEBERRY_SCRIPT=%CONDA_PREFIX%\Scripts\raveberry"
+
+if not exist "%RAVEBERRY_SCRIPT%" (
+    call :die "Installed raveberry script was not found at %RAVEBERRY_SCRIPT%"
     exit /b 1
 )
 
-raveberry --help >nul 2>&1
+python "%RAVEBERRY_SCRIPT%" --help >nul 2>&1
 if errorlevel 1 (
-    call :die "raveberry command exists but failed to run."
+    call :die "raveberry script exists but failed to run through python."
     exit /b 1
 )
 
@@ -472,7 +473,7 @@ call :write_config_file
 if errorlevel 1 exit /b 1
 
 call :log "[6/6] Running installer"
-raveberry --config-file "%CONFIG_PATH%" install
+python "%RAVEBERRY_SCRIPT%" --config-file "%CONFIG_PATH%" install
 if errorlevel 1 (
     call :die "raveberry install failed."
     exit /b 1
