@@ -195,11 +195,11 @@ help        show this help and exit""",
 
         try:
             subprocess.call(
-                "python3 manage.py migrate".split(),
+                [sys.executable, "manage.py", "migrate"],
                 env={"DJANGO_DEBUG": "1", **os.environ},
             )
             subprocess.call(
-                "python3 manage.py runserver 0:8080".split(),
+                [sys.executable, "manage.py", "runserver", "127.0.0.1:8080"],
                 env={"DJANGO_DEBUG": "1", **additional_env, **os.environ},
             )
         except KeyboardInterrupt:
@@ -213,6 +213,30 @@ help        show this help and exit""",
     @staticmethod
     def user_prepare() -> None:
         """Prepare the userspace version of Raveberry."""
+        if os.name == "nt":
+            print("first time running raveberry on Windows, preparing...")
+            subprocess.check_call(
+                [sys.executable, "manage.py", "migrate"],
+                env={"DJANGO_DEBUG": "1", **os.environ},
+            )
+            subprocess.check_call(
+                [
+                    sys.executable,
+                    "manage.py",
+                    "shell",
+                    "-c",
+                    (
+                        "from django.contrib.auth.models import User; "
+                        "User.objects.filter(username='admin').exists() or "
+                        "User.objects.create_superuser('admin', email='', password='admin'); "
+                        "User.objects.filter(username='mod').exists() or "
+                        "User.objects.create_user('mod', password='mod')"
+                    ),
+                ],
+                env={"DJANGO_DEBUG": "1", **os.environ},
+            )
+            return
+
         required_packages = [("ffmpeg", "ffmpeg"), ("mopidy", "mopidy")]
         missing_packages = []
         for executable, package_name in required_packages:
