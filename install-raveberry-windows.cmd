@@ -33,12 +33,12 @@ REM ---------- Logging ----------
 :log
 echo(
 echo ==> %~1
-exit /b 0
+goto :eof
 
 :warn
 >&2 echo(
 >&2 echo [WARN] %~1
-exit /b 0
+goto :eof
 
 :die
 >&2 echo(
@@ -62,7 +62,8 @@ exit /b 1
 set "_port=%~1"
 if not defined _port exit /b 1
 echo(%_port%| findstr /R "^[0-9][0-9]*$" >nul || exit /b 1
-set /a _portnum=%_port% >nul 2>&1
+2>nul set /a _portnum=%_port%
+if errorlevel 1 exit /b 1
 if %_portnum% lss 1 exit /b 1
 if %_portnum% gtr 65535 exit /b 1
 exit /b 0
@@ -107,7 +108,7 @@ if defined _at_validator (
 )
 
 set "%_at_var%=%INPUT_VALUE%"
-exit /b 0
+goto :eof
 
 :ask_bool
 set "_ab_var=%~1"
@@ -126,7 +127,7 @@ if errorlevel 1 (
 )
 
 set "%_ab_var%=%RETVAL%"
-exit /b 0
+goto :eof
 
 :show_explainer
 echo(
@@ -159,7 +160,7 @@ echo IMPORTANT:
 echo This script must be run from an activated Conda environment intended for Raveberry.
 echo It will verify that before installing.
 echo(
-exit /b 0
+goto :eof
 
 REM ---------- Conda checks ----------
 :ensure_any_conda_environment
@@ -215,7 +216,7 @@ set "AUDIO_NORMALIZATION=%DEFAULT_AUDIO_NORMALIZATION%"
 set "HOTSPOT=%DEFAULT_HOTSPOT%"
 set "BUZZER=%DEFAULT_BUZZER%"
 
-exit /b 0
+goto :eof
 
 :print_summary
 echo(
@@ -238,7 +239,7 @@ echo - hotspot                 = %HOTSPOT%
 echo - buzzer                  = %BUZZER%
 echo ================================================
 echo(
-exit /b 0
+goto :eof
 
 :edit_loop
 :edit_loop_top
@@ -268,33 +269,61 @@ if /I not "%ACTION%"=="E" if /I not "%ACTION%"=="EDIT" (
 set "FIELDNUM="
 set /p "FIELDNUM=Enter field number to edit (1-9): "
 
-if "%FIELDNUM%"=="1" call :ask_text EXPECTED_CONDA_ENV "Expected active Conda environment name for Raveberry" "%EXPECTED_CONDA_ENV%"
-if "%FIELDNUM%"=="2" call :warn "CURRENT_CONDA_ENV is read-only. Activate a different Conda env outside this script, then rerun."
-if "%FIELDNUM%"=="3" call :ask_text CONFIG_PATH "Path to write raveberry.yaml" "%CONFIG_PATH%"
-if "%FIELDNUM%"=="4" call :ask_text INSTALL_DIR "Raveberry install_directory" "%INSTALL_DIR%" is_abs_path
-if "%FIELDNUM%"=="5" call :ask_text HOSTNAME_VALUE "Hostname for Raveberry" "%HOSTNAME_VALUE%"
-if "%FIELDNUM%"=="6" call :ask_text PORT_VALUE "Web port" "%PORT_VALUE%" is_valid_port
-if "%FIELDNUM%"=="7" call :ask_bool YOUTUBE "Enable YouTube support?" "%YOUTUBE%"
-if "%FIELDNUM%"=="8" call :ask_bool SPOTIFY "Enable Spotify support?" "%SPOTIFY%"
-if "%FIELDNUM%"=="9" call :ask_bool SOUNDCLOUD "Enable SoundCloud support?" "%SOUNDCLOUD%"
+if "%FIELDNUM%"=="1" goto :edit_field_1
+if "%FIELDNUM%"=="2" goto :edit_field_2
+if "%FIELDNUM%"=="3" goto :edit_field_3
+if "%FIELDNUM%"=="4" goto :edit_field_4
+if "%FIELDNUM%"=="5" goto :edit_field_5
+if "%FIELDNUM%"=="6" goto :edit_field_6
+if "%FIELDNUM%"=="7" goto :edit_field_7
+if "%FIELDNUM%"=="8" goto :edit_field_8
+if "%FIELDNUM%"=="9" goto :edit_field_9
 
-if not "%FIELDNUM%"=="1" if not "%FIELDNUM%"=="2" if not "%FIELDNUM%"=="3" if not "%FIELDNUM%"=="4" if not "%FIELDNUM%"=="5" if not "%FIELDNUM%"=="6" if not "%FIELDNUM%"=="7" if not "%FIELDNUM%"=="8" if not "%FIELDNUM%"=="9" (
-    call :warn "Invalid field number."
-)
-
+call :warn "Invalid field number."
 goto :edit_loop_top
 
-call :warn "Unknown option."
+:edit_field_1
+call :ask_text EXPECTED_CONDA_ENV "Expected active Conda environment name for Raveberry" "%EXPECTED_CONDA_ENV%"
+goto :edit_loop_top
+
+:edit_field_2
+call :warn "CURRENT_CONDA_ENV is read-only. Activate a different Conda env outside this script, then rerun."
+goto :edit_loop_top
+
+:edit_field_3
+call :ask_text CONFIG_PATH "Path to write raveberry.yaml" "%CONFIG_PATH%"
+goto :edit_loop_top
+
+:edit_field_4
+call :ask_text INSTALL_DIR "Raveberry install_directory" "%INSTALL_DIR%" is_abs_path
+goto :edit_loop_top
+
+:edit_field_5
+call :ask_text HOSTNAME_VALUE "Hostname for Raveberry" "%HOSTNAME_VALUE%"
+goto :edit_loop_top
+
+:edit_field_6
+call :ask_text PORT_VALUE "Web port" "%PORT_VALUE%" is_valid_port
+goto :edit_loop_top
+
+:edit_field_7
+call :ask_bool YOUTUBE "Enable YouTube support?" "%YOUTUBE%"
+goto :edit_loop_top
+
+:edit_field_8
+call :ask_bool SPOTIFY "Enable Spotify support?" "%SPOTIFY%"
+goto :edit_loop_top
+
+:edit_field_9
+call :ask_bool SOUNDCLOUD "Enable SoundCloud support?" "%SOUNDCLOUD%"
 goto :edit_loop_top
 
 REM ---------- Install helpers ----------
 :ensure_git
 where git >nul 2>&1
 if not errorlevel 1 (
-    for /f "delims=" %%I in ('where git') do (
-        echo Found git: %%I
-        goto :ensure_git_done
-    )
+    echo Found git in PATH.
+    exit /b 0
 )
 
 call :warn "git was not found in the active environment or PATH."
@@ -305,7 +334,7 @@ if errorlevel 1 (
 )
 
 call :log "Installing git into the active Conda environment"
-call conda install -y git
+conda install -y git
 if errorlevel 1 (
     call :die "Failed to install git with conda."
     exit /b 1
@@ -317,12 +346,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-for /f "delims=" %%I in ('where git') do (
-    echo Found git: %%I
-    goto :ensure_git_done
-)
-
-:ensure_git_done
+echo Found git in PATH.
 exit /b 0
 
 :write_config_file
