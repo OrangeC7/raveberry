@@ -147,39 +147,39 @@ class YoutubeSongProvider(SongProvider, Youtube):
             return False
         return os.path.isfile(self.get_path())
 
-def check_available(self) -> bool:
-    self.info_dict = {}
+    def check_available(self) -> bool:
+        self.info_dict = {}
 
-    def extract_info(video_id: str) -> bool:
-        try:
-            with yt_dlp.YoutubeDL(Youtube.get_ydl_opts()) as ydl:
-                self.info_dict = ydl.extract_info(video_id, download=False) or {}
-            return True
-        except (yt_dlp.utils.ExtractorError, yt_dlp.utils.DownloadError) as error:
-            logging.warning("error during availability check for %s:", video_id)
-            logging.warning(error)
+        def extract_info(video_id: str) -> bool:
+            try:
+                with yt_dlp.YoutubeDL(Youtube.get_ydl_opts()) as ydl:
+                    self.info_dict = ydl.extract_info(video_id, download=False) or {}
+                return True
+            except (yt_dlp.utils.ExtractorError, yt_dlp.utils.DownloadError) as error:
+                logging.warning("error during availability check for %s:", video_id)
+                logging.warning(error)
+                return False
+
+        if self.id:
+            # do not search if an id is already present
+            extract_info(self.id)
+        else:
+            # do not filter to only receive "song" results, because we would skip the top result
+            results = ytmusicapi.YTMusic().search(self.query)
+            for result in results:
+                if result["resultType"] not in ("video", "song"):
+                    continue
+                if song_utils.is_forbidden(result["title"]):
+                    continue
+                if extract_info(result["videoId"]):
+                    break
+
+        if not self.info_dict:
+            self.error = "No songs found"
             return False
 
-    if self.id:
-        # do not search if an id is already present
-        extract_info(self.id)
-    else:
-        # do not filter to only receive "song" results, because we would skip the top result
-        results = ytmusicapi.YTMusic().search(self.query)
-        for result in results:
-            if result["resultType"] not in ("video", "song"):
-                continue
-            if song_utils.is_forbidden(result["title"]):
-                continue
-            if extract_info(result["videoId"]):
-                break
-
-    if not self.info_dict:
-        self.error = "No songs found"
-        return False
-
-    self.id = self.info_dict["id"]
-    return self.check_not_too_large(self.info_dict.get("filesize"))
+        self.id = self.info_dict["id"]
+        return self.check_not_too_large(self.info_dict.get("filesize"))
 
     def _download(self) -> bool:
         download_error = None
@@ -241,12 +241,52 @@ def check_available(self) -> bool:
             raise ValueError()
         return "https://www.youtube.com/watch?v=" + self.id
 
-def gather_metadata(self) -> bool:
+    def gather_metadata(self) -> bool:
+        metadata = self.get_local_metadata(self.get_path())
+
+        if not self.info_dict:
+            try:
+                with yt_dlp.YoutubeDL(Youtube.get_ydl_opts()) as ydl:
+                    self.info_dict = (
+                        ydl.extract_info(self.get_external_url(), download=False) or {}
+                    )
+            except (yt_dlp.utils.ExtractorError, yt_dlp.utils.DownloadError) as error:
+                logging.warning(
+                    "could not refresh youtube metadata for %s:",
+                    self.get_external_url(),
+                )
+                logging.warning(error)
+                self.info_dict = {}
+
+        if self.info_dict:
+            title = (
+                self.info_dict.get("track")
+                or self.info_dict.get("title")
+                or metadata.get("title")
+                or self.get_external_url()
+            )
+            artist = (
+                self.info_dict.get("artist")
+                or self.info_dict.get("uploader")
+                or self.info_dict.get("channel")
+                or metadata.get("artist")
+                or ""
+            )
+            duration = self.info_dict.get("duration") or metadata.get("duration", -1)
+
+            metadata["title"] = title
+            metadata["artist"] = artist
+            metadata["duration"] = duration
+
+        self.metadata = metadata
+        return True
 
     def get_suggestion(self) -> str:
         result = ytmusicapi.YTMusic().get_watch_playlist(self.id, limit=2)
+
         # the first entry usually is the song itself -> use the second one
         suggested_id = result["tracks"][1]["videoId"]
+
         return "https://www.youtube.com/watch?v=" + suggested_id
 
     def request_radio(self, session_key: str) -> HttpResponse:
@@ -256,14 +296,18 @@ def gather_metadata(self) -> bool:
         result = ytmusicapi.YTMusic().get_watch_playlist(
             self.id, limit=storage.get("max_playlist_items"), radio=True
         )
+
         radio_id = result["playlistId"]
 
         provider = YoutubePlaylistProvider("", None)
         provider.id = radio_id
         provider.title = radio_id
+
         for entry in result["tracks"]:
             provider.urls.append("https://www.youtube.com/watch?v=" + entry["videoId"])
+
         provider.request("", archive=False, manually_requested=False)
+
         return HttpResponse("queueing radio (might take some time)")
 
 
