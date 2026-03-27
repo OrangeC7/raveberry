@@ -27,7 +27,7 @@ INACTIVITY_PERIOD = 600
 
 def has_controls(user) -> bool:
     """Determines whether the given user is allowed to control playback."""
-    return user.username == "mod" or is_admin(user)
+    return is_admin(user)
 
 
 def is_admin(user) -> bool:
