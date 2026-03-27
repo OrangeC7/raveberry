@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import random
-import urllib.parse
+from pathlib import Path
 from typing import Optional
 
 from django.http.response import HttpResponse
@@ -62,7 +62,7 @@ class LocalSongProvider(SongProvider):
         return song_utils.get_path(self.get_external_url())
 
     def get_internal_url(self) -> str:
-        return "file://" + urllib.parse.quote(self.get_path())
+        return Path(self.get_path()).resolve().as_uri()
 
     def get_external_url(self) -> str:
         assert self.id
