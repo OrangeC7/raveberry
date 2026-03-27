@@ -1,28 +1,32 @@
+from pathlib import Path
 import setuptools
 
-with open("raveberry/VERSION") as f:
+BASE_DIR = Path(__file__).resolve().parent
+BACKEND_DIR = BASE_DIR / "backend"
+
+with open(BACKEND_DIR / "VERSION", encoding="utf-8") as f:
     version = f.read().strip()
 
-with open("README.md") as f:
+with open(BASE_DIR / "README.md", encoding="utf-8") as f:
     long_description = f.read()
 
-
 def parse_requirements(lines):
-    # remove comments, empty lines and arguments
-    return list(
-        line.split(" ")[0] for line in lines if line and not line.startswith("#")
-    )
+    return [
+        line.split(" ")[0]
+        for line in lines
+        if line and not line.startswith("#")
+    ]
 
-
-with open("raveberry/requirements/common.txt") as f:
+with open(BACKEND_DIR / "requirements" / "common.txt", encoding="utf-8") as f:
     run_packages = parse_requirements(f.read().splitlines())
-with open("raveberry/requirements/youtube.txt") as f:
+
+with open(BACKEND_DIR / "requirements" / "youtube.txt", encoding="utf-8") as f:
     run_packages.extend(parse_requirements(f.read().splitlines()))
 
-with open("raveberry/requirements/install.txt") as f:
+with open(BACKEND_DIR / "requirements" / "install.txt", encoding="utf-8") as f:
     install_packages = parse_requirements(f.read().splitlines())
 
-with open("raveberry/requirements/screenvis.txt") as f:
+with open(BACKEND_DIR / "requirements" / "screenvis.txt", encoding="utf-8") as f:
     screenvis_packages = parse_requirements(f.read().splitlines())
 
 setuptools.setup(
@@ -40,7 +44,18 @@ setuptools.setup(
         "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
         "Programming Language :: Python :: 3",
     ],
-    packages=["raveberry"],
+    packages=[
+        "raveberry",
+        "raveberry.core",
+        "raveberry.main",
+        "raveberry.tests",
+    ],
+    package_dir={
+        "raveberry": "backend",
+        "raveberry.core": "backend/core",
+        "raveberry.main": "backend/main",
+        "raveberry.tests": "backend/tests",
+    },
     include_package_data=True,
     python_requires=">=3.8",
     extras_require={
