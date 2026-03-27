@@ -2,6 +2,7 @@
 import logging.config
 import os
 import pathlib
+import shutil
 import subprocess
 import sys
 from typing import List
@@ -215,13 +216,14 @@ if not os.path.exists(os.path.join(BASE_DIR, "static/admin")):
 
     DJANGO_PATH = os.path.dirname(django.__file__)
     STATIC_ADMIN = os.path.join(DJANGO_PATH, "contrib/admin/static/admin")
+    STATIC_ADMIN_DEST = os.path.join(BASE_DIR, "static/admin")
     if not DOCKER:
         # create symlink to admin static files if not present
         # In the docker setup, the nginx container includes the static files on build
         try:
             os.symlink(
                 STATIC_ADMIN,
-                os.path.join(BASE_DIR, "static/admin"),
+                STATIC_ADMIN_DEST,
                 target_is_directory=True,
             )
             print("linked static admin files")
@@ -230,6 +232,14 @@ if not os.path.exists(os.path.join(BASE_DIR, "static/admin")):
             # maybe because of a race condition.
             # The try/except should prevent crashing the installation.
             pass
+        except OSError as exc:
+            # Windows often blocks symlink creation without Developer Mode
+            # or the right privilege. Fall back to copying the admin files.
+            if os.name == "nt" or getattr(exc, "winerror", None) == 1314:
+                shutil.copytree(STATIC_ADMIN, STATIC_ADMIN_DEST, dirs_exist_ok=True)
+                print("copied static admin files")
+            else:
+                raise
 
 # channels
 ASGI_APPLICATION = "main.routing.APPLICATION"
