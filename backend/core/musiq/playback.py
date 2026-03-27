@@ -53,19 +53,24 @@ class Playback:
             "fake": FakePlayer(),
         }
 
+        if os.name == "nt":
+            from core.musiq.windows_player import WindowsPlayer
+            self.players["windows"] = WindowsPlayer()
+
         if redis.get("spotify_available"):
             from core.musiq.spotify_player import SpotifyPlayer
-
             self.players["spotify"] = SpotifyPlayer()
+
         if redis.get("mopidy_available"):
             from core.musiq.mopidy_player import MopidyPlayer
-
             self.players["mopidy"] = MopidyPlayer()
 
         if redis.get("spotify_available") and storage.get("output").startswith(
             "spotify-"
         ):
             redis.put("active_player", "spotify")
+        elif os.name == "nt" and storage.get("output") == "windows-default":
+            redis.put("active_player", "windows")
         elif not redis.get("mopidy_available"):
             redis.put("active_player", "fake")
         else:
