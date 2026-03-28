@@ -1,10 +1,463 @@
-{% extends 'base.html' %}
-{% load static %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>FURATIC Stream Offline</title>
+    <meta name="theme-color" content="#050816">
+    <link rel="icon" href="{{ furatic_logo_url }}" type="image/svg+xml">
+    <link rel="shortcut icon" href="{{ furatic_logo_url }}" type="image/svg+xml">
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #050816;
+        --bg-top: #091022;
+        --bg-bottom: #03040b;
+        --text: #eef4ff;
+        --muted: rgba(238, 244, 255, 0.76);
+        --muted-2: rgba(238, 244, 255, 0.58);
+        --panel-shadow: 0 28px 120px rgba(0, 0, 0, 0.55);
+        --radius: 30px;
+        --cyan: 0, 142, 248;
+        --orange: 222, 104, 0;
+        --green: 74, 227, 0;
+        --magenta: 200, 0, 224;
+      }
 
-{% block content %}
-<ul class="list-group">
-	<li class="list-group-item list-item centered list-header">
-		Streaming seems to be disabled :(
-	</li>
-</ul>
-{% endblock %}
+      * { box-sizing: border-box; }
+
+      html, body {
+        width: 100%;
+        min-height: 100%;
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: Inter, Roboto, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+      }
+
+      body {
+        position: relative;
+        overflow-x: hidden;
+      }
+
+      #aurora {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+        z-index: 0;
+        background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg) 56%, var(--bg-bottom) 100%);
+        transform: translateZ(0);
+      }
+
+      .noise,
+      .vignette {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 1;
+      }
+
+      .noise {
+        opacity: 0.045;
+        background-image:
+          radial-gradient(circle at 20% 20%, rgba(255,255,255,0.12) 0, rgba(255,255,255,0) 34%),
+          radial-gradient(circle at 80% 0%, rgba(255,255,255,0.08) 0, rgba(255,255,255,0) 28%);
+        mix-blend-mode: screen;
+      }
+
+      .vignette {
+        background:
+          radial-gradient(circle at 50% -10%, rgba(255,255,255,0.06), transparent 42%),
+          radial-gradient(circle at 50% 50%, transparent 0%, transparent 54%, rgba(0,0,0,0.22) 100%);
+      }
+
+      .page {
+        position: relative;
+        z-index: 2;
+        min-height: 100svh;
+        display: grid;
+        place-items: center;
+        padding: clamp(18px, 3vw, 40px);
+      }
+
+      .shell {
+        width: min(100%, 920px);
+        opacity: 0;
+        transform: translateY(18px) scale(0.985);
+        transition:
+          opacity 720ms cubic-bezier(0.22, 1, 0.36, 1),
+          transform 900ms cubic-bezier(0.22, 1, 0.36, 1);
+      }
+
+      body.is-ready .shell {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+
+      .card {
+        position: relative;
+        overflow: hidden;
+        isolation: isolate;
+        border-radius: var(--radius);
+        padding: clamp(24px, 4vw, 44px);
+        background: rgba(6, 10, 22, 0.29);
+        border: 1px solid rgba(255, 255, 255, 0.10);
+        box-shadow: var(--panel-shadow);
+        -webkit-backdrop-filter: blur(28px) saturate(118%);
+        backdrop-filter: blur(28px) saturate(118%);
+      }
+
+      .card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: -2;
+        background: rgba(255, 255, 255, 0.018);
+      }
+
+      .card::after {
+        content: "";
+        position: absolute;
+        inset: 1px;
+        border-radius: calc(var(--radius) - 1px);
+        z-index: -1;
+        background:
+          radial-gradient(circle at top left, rgba(255,255,255,0.10), transparent 30%),
+          linear-gradient(180deg, rgba(255,255,255,0.018), rgba(255,255,255,0));
+        opacity: 0.8;
+        pointer-events: none;
+      }
+
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border-radius: 999px;
+        font-size: 12px;
+        line-height: 1;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: rgba(255,255,255,0.92);
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: linear-gradient(135deg, rgba(var(--orange), 1), rgba(var(--magenta), 1));
+        box-shadow:
+          0 0 0 0 rgba(var(--orange), 0.45),
+          0 0 18px rgba(var(--orange), 0.58);
+        animation: pulse 2.3s ease-in-out infinite;
+        flex: none;
+      }
+
+      .hero {
+        display: grid;
+        gap: 18px;
+        margin-top: 22px;
+      }
+
+      .hero img {
+        display: block;
+        width: min(100%, 360px);
+        height: auto;
+        filter:
+          drop-shadow(0 10px 30px rgba(0,0,0,0.26))
+          drop-shadow(0 0 20px rgba(var(--cyan), 0.18));
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(36px, 6vw, 64px);
+        line-height: 0.95;
+        letter-spacing: -0.05em;
+        text-wrap: balance;
+      }
+
+      .lead {
+        margin: 0;
+        max-width: 58ch;
+        color: var(--muted);
+        font-size: clamp(16px, 2.15vw, 21px);
+        line-height: 1.62;
+        text-wrap: pretty;
+      }
+
+      .notify-block {
+        margin-top: 10px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .notify-title {
+        color: var(--muted-2);
+        font-size: 13px;
+        line-height: 1;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        font-weight: 800;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        min-height: 50px;
+        padding: 0 18px;
+        border-radius: 16px;
+        text-decoration: none;
+        font-weight: 700;
+        color: var(--text);
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.12);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+        transition:
+          transform 180ms ease,
+          border-color 180ms ease,
+          background 180ms ease,
+          box-shadow 180ms ease;
+      }
+
+      .button:hover {
+        transform: translateY(-1px);
+        border-color: rgba(255,255,255,0.22);
+        background: rgba(255,255,255,0.08);
+      }
+
+      .button.primary {
+        background: linear-gradient(135deg, rgba(var(--cyan), 0.26), rgba(var(--magenta), 0.18));
+        border-color: rgba(var(--cyan), 0.34);
+        box-shadow:
+          0 18px 40px rgba(0,0,0,0.18),
+          inset 0 1px 0 rgba(255,255,255,0.05),
+          0 0 24px rgba(var(--cyan), 0.10);
+      }
+
+      .button.secondary {
+        background: linear-gradient(135deg, rgba(var(--orange), 0.22), rgba(var(--magenta), 0.14));
+        border-color: rgba(var(--orange), 0.32);
+      }
+
+      .button.subtle {
+        background: rgba(255,255,255,0.04);
+      }
+
+      .note {
+        margin-top: 16px;
+        color: var(--muted-2);
+        font-size: 14px;
+        line-height: 1.65;
+      }
+
+      @keyframes pulse {
+        0%, 100% {
+          transform: scale(1);
+          box-shadow:
+            0 0 0 0 rgba(var(--orange), 0.45),
+            0 0 18px rgba(var(--orange), 0.58);
+        }
+        50% {
+          transform: scale(1.08);
+          box-shadow:
+            0 0 0 8px rgba(var(--orange), 0.00),
+            0 0 22px rgba(var(--orange), 0.72);
+        }
+      }
+
+      @media (max-width: 640px) {
+        .card {
+          padding: 22px;
+        }
+
+        .actions {
+          flex-direction: column;
+        }
+
+        .button {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="aurora" aria-hidden="true"></canvas>
+    <div class="noise" aria-hidden="true"></div>
+    <div class="vignette" aria-hidden="true"></div>
+
+    <main class="page">
+      <div class="shell">
+        <section class="card">
+          <div class="status"><span class="status-dot"></span> Stream offline</div>
+          <div class="hero">
+            <img src="{{ furatic_logo_wide_url }}" alt="FURATIC logo">
+            <h1>The live stream is not active right now.</h1>
+            <p class="lead">
+              The queue UI is online, but the audio stream endpoint is currently unavailable. Check back shortly, or join the community channels below so you get notified when the next event goes live.
+            </p>
+          </div>
+
+          <div class="notify-block">
+            <div class="notify-title">Get notified for new events here:</div>
+            <div class="actions">
+              {% if discord_invite_url %}
+              <a class="button primary" href="{{ discord_invite_url }}" target="_blank" rel="noopener">Discord invite</a>
+              {% endif %}
+              {% if vrchat_group_url %}
+              <a class="button secondary" href="{{ vrchat_group_url }}" target="_blank" rel="noopener">VRChat group</a>
+              {% endif %}
+              <a class="button subtle" href="/">Back to queue</a>
+            </div>
+          </div>
+
+          <p class="note">
+            If you expected audio here, verify that the active player and stream output are running on the Windows host, then refresh this page.
+          </p>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      (function () {
+        const canvas = document.getElementById("aurora");
+        const ctx = canvas.getContext("2d");
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const prefersReducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        const widthRef = { value: 0 };
+        const heightRef = { value: 0 };
+        let rafId = 0;
+
+        function random(min, max) {
+          return Math.random() * (max - min) + min;
+        }
+
+        function makeOrb(index) {
+          const sizeBase = Math.min(widthRef.value || window.innerWidth, heightRef.value || window.innerHeight || 900);
+          return {
+            radius: random(sizeBase * 0.26, sizeBase * 0.46),
+            color: [
+              [0, 142, 248],
+              [200, 0, 224],
+              [222, 104, 0],
+              [74, 227, 0],
+            ][index % 4],
+            alpha: random(0.12, 0.24),
+            centerX: random(0.16, 0.84),
+            centerY: random(0.18, 0.82),
+            driftX: random(0.07, 0.16),
+            driftY: random(0.07, 0.16),
+            phase: random(0, Math.PI * 2),
+            speed: random(0.00004, 0.00009),
+            wobble: random(0.6, 1.2),
+          };
+        }
+
+        let orbs = Array.from({ length: 5 }, function (_, index) {
+          return makeOrb(index);
+        });
+
+        function resizeCanvas() {
+          const width = window.innerWidth;
+          const height = window.innerHeight;
+          widthRef.value = width;
+          heightRef.value = height;
+          canvas.width = Math.round(width * dpr);
+          canvas.height = Math.round(height * dpr);
+          canvas.style.width = width + "px";
+          canvas.style.height = height + "px";
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          orbs = Array.from({ length: 5 }, function (_, index) {
+            return makeOrb(index);
+          });
+          drawBase();
+        }
+
+        function drawBase() {
+          const width = widthRef.value;
+          const height = heightRef.value;
+          const gradient = ctx.createLinearGradient(0, 0, 0, height);
+          gradient.addColorStop(0, "#091022");
+          gradient.addColorStop(0.55, "#050816");
+          gradient.addColorStop(1, "#03040b");
+          ctx.clearRect(0, 0, width, height);
+          ctx.fillStyle = gradient;
+          ctx.fillRect(0, 0, width, height);
+        }
+
+        function drawOrb(x, y, radius, color, alpha) {
+          const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+          gradient.addColorStop(0, "rgba(" + color[0] + ", " + color[1] + ", " + color[2] + ", " + alpha + ")");
+          gradient.addColorStop(0.34, "rgba(" + color[0] + ", " + color[1] + ", " + color[2] + ", " + alpha * 0.42 + ")");
+          gradient.addColorStop(1, "rgba(" + color[0] + ", " + color[1] + ", " + color[2] + ", 0)");
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+          ctx.arc(x, y, radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        function render(timestamp) {
+          drawBase();
+          const width = widthRef.value;
+          const height = heightRef.value;
+          ctx.globalCompositeOperation = "screen";
+
+          orbs.forEach(function (orb, index) {
+            const t = timestamp * orb.speed;
+            const x = width * (orb.centerX + Math.sin(t + orb.phase) * orb.driftX + Math.sin(t * 0.61 + index) * 0.03);
+            const y = height * (orb.centerY + Math.cos(t * orb.wobble + orb.phase) * orb.driftY + Math.sin(t * 0.48 + index) * 0.024);
+            const radius = orb.radius * (0.94 + Math.sin(t * 0.85 + index) * 0.08);
+            drawOrb(x, y, radius, orb.color, orb.alpha);
+          });
+
+          ctx.globalCompositeOperation = "source-over";
+          rafId = window.requestAnimationFrame(render);
+        }
+
+        resizeCanvas();
+
+        if (prefersReducedMotion) {
+          drawBase();
+          ctx.globalCompositeOperation = "screen";
+          drawOrb(widthRef.value * 0.22, heightRef.value * 0.24, Math.min(widthRef.value, heightRef.value) * 0.42, [0, 142, 248], 0.20);
+          drawOrb(widthRef.value * 0.76, heightRef.value * 0.24, Math.min(widthRef.value, heightRef.value) * 0.38, [200, 0, 224], 0.19);
+          drawOrb(widthRef.value * 0.28, heightRef.value * 0.78, Math.min(widthRef.value, heightRef.value) * 0.34, [74, 227, 0], 0.12);
+          drawOrb(widthRef.value * 0.80, heightRef.value * 0.72, Math.min(widthRef.value, heightRef.value) * 0.40, [222, 104, 0], 0.18);
+          ctx.globalCompositeOperation = "source-over";
+        } else {
+          rafId = window.requestAnimationFrame(render);
+        }
+
+        let resizeTimer = 0;
+        window.addEventListener("resize", function () {
+          window.clearTimeout(resizeTimer);
+          resizeTimer = window.setTimeout(function () {
+            resizeCanvas();
+          }, 90);
+        }, { passive: true });
+
+        window.addEventListener("beforeunload", function () {
+          if (rafId) {
+            window.cancelAnimationFrame(rafId);
+          }
+        });
+
+        window.requestAnimationFrame(function () {
+          document.body.classList.add("is-ready");
+        });
+      })();
+    </script>
+  </body>
+</html>
