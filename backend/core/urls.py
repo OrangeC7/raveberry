@@ -8,6 +8,7 @@ from django.views.generic import RedirectView
 
 from core import api
 from core import base
+from core import moderation
 from core.lights import controller as lights_controller
 from core.lights import lights
 from core.musiq import controller as musiq_controller
@@ -33,6 +34,7 @@ urlpatterns: List[Union[URLPattern, URLResolver]] = [
     path("stream/", base.no_stream, name="no-stream"),
     path("network-info/", network_info.index, name="network-info"),
     path("settings/", base.settings_disabled, name="settings"),
+    path("moderator/", moderation.dashboard, name="moderator"),
     path("accounts/", include("django.contrib.auth.urls")),
     path("login/", RedirectView.as_view(pattern_name="login", permanent=False)),
     path("logged-in/", base.logged_in, name="logged-in"),
@@ -43,6 +45,30 @@ urlpatterns: List[Union[URLPattern, URLResolver]] = [
             [
                 path("version/", api.version, name="version"),
                 path("site-mode/", base.site_mode_status, name="site-mode-status"),
+                path(
+                    "moderator/",
+                    include(
+                        [
+                            path("state/", moderation.state, name="moderator-state"),
+                            path(
+                                "remove-song/",
+                                moderation.remove_song,
+                                name="moderator-remove-song",
+                            ),
+                            path("ban-ip/", moderation.ban_ip, name="moderator-ban-ip"),
+                            path(
+                                "unban-ip/",
+                                moderation.unban_ip,
+                                name="moderator-unban-ip",
+                            ),
+                            path(
+                                "site-mode/",
+                                moderation.set_site_mode,
+                                name="moderator-site-mode",
+                            ),
+                        ]
+                    ),
+                ),
                 path(
                     "musiq/",
                     include(
