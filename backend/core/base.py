@@ -37,6 +37,18 @@ def _get_apk_link() -> str:
     return "https://github.com/raveberry/shareberry/releases/latest/download/shareberry.apk"
 
 
+def _furatic_public_context() -> Dict[str, Any]:
+    """Shared public Furatic branding / link context."""
+    return {
+        "furatic_public_url": conf.FURATIC_PUBLIC_URL,
+        "furatic_logo_url": conf.FURATIC_LOGO_SQUARE_URL,
+        "furatic_logo_wide_url": conf.FURATIC_LOGO_WIDE_URL,
+        "discord_invite_url": conf.FURATIC_DISCORD_INVITE_URL,
+        "vrchat_group_url": conf.FURATIC_VRCHAT_GROUP_URL,
+        "hls_url": conf.FURATIC_HLS_URL,
+    }
+
+
 def _increment_counter() -> int:
     with transaction.atomic():
         counter = models.Counter.objects.get_or_create(id=1, defaults={"value": 0})[0]
@@ -52,7 +64,7 @@ def context(request: WSGIRequest) -> Dict[str, Any]:
     from core import urls
 
     _increment_counter()
-    return {
+    context = {
         "base_urls": urls.base_paths,
         "interactivity": storage.get("interactivity"),
         "interactivities": {
@@ -80,6 +92,8 @@ def context(request: WSGIRequest) -> Dict[str, Any]:
         "controls_enabled": user_manager.has_controls(request.user)
         or storage.get("interactivity") == storage.Interactivity.full_control,
         "is_admin": user_manager.is_admin(request.user),
+        "is_moderator": user_manager.is_moderator(request.user),
+        "can_moderate": user_manager.can_moderate(request.user),
         "apk_link": _get_apk_link(),
         "local_enabled": storage.get("local_enabled"),
         "youtube_enabled": storage.get("youtube_enabled"),
@@ -87,6 +101,8 @@ def context(request: WSGIRequest) -> Dict[str, Any]:
         "soundcloud_enabled": storage.get("soundcloud_enabled"),
         "jamendo_enabled": storage.get("jamendo_enabled"),
     }
+    context.update(_furatic_public_context())
+    return context
 
 
 def state_dict() -> Dict[str, Any]:
@@ -111,11 +127,12 @@ def state_dict() -> Dict[str, Any]:
 
 def landing(request: WSGIRequest) -> HttpResponse:
     """Renders the static page with the embedded player iframe."""
-    return render(request, "landing.html")
+    return render(request, "landing.html", _furatic_public_context())
+
 
 def afterhours(_request: WSGIRequest) -> HttpResponse:
     """Renders the FURATIC After Hours page."""
-    return render(_request, "landing_afterhours.html")
+    return render(_request, "landing_afterhours.html", _furatic_public_context())
 
 
 def site_mode_status(_request: WSGIRequest) -> HttpResponse:
@@ -146,9 +163,11 @@ def submit_hashtag(request: WSGIRequest) -> HttpResponse:
 
 def logged_in(request: WSGIRequest) -> HttpResponse:
     """This endpoint is visited after every login.
-    Redirect the admin to Django admin and everybody else to the public page."""
+    Redirect privileged users to the appropriate dashboard."""
     if user_manager.is_admin(request.user):
         return HttpResponseRedirect("/admin/")
+    if user_manager.can_moderate(request.user):
+        return HttpResponseRedirect(reverse("moderator"))
     return HttpResponseRedirect(reverse("base"))
 
 
