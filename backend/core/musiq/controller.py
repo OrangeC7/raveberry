@@ -218,6 +218,7 @@ def remove_all(request: WSGIRequest) -> HttpResponse:
     if not user_manager.is_admin(request.user):
         return HttpResponseForbidden()
     with transaction.atomic():
+        user_manager.clear_queue_slots()
         playback.queue.all().delete()
     return HttpResponse()
 
