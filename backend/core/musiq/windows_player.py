@@ -77,11 +77,14 @@ def _normalize_media_source(uri: str) -> str:
 
 class WindowsPlayer(player.Player):
     def __init__(self) -> None:
+        global _INSTANCE
+
         if vlc is None:
             raise PlaybackError("python-vlc is not installed")
 
         self.instance = vlc.Instance()
         self.media_player = self.instance.media_player_new()
+        _INSTANCE = self
 
     def _set_media(self, uri: str) -> None:
         uri = _normalize_media_source(uri)
