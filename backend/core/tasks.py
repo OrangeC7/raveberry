@@ -19,8 +19,17 @@ if strtobool(os.environ.get("DJANGO_NO_CELERY", "0")):
             """This decorator mocks celery's delay function.
             This delay() creates a thread and starts it."""
 
+            def thread_target(*args: Any, **kwargs: Any) -> None:
+                from django.db import close_old_connections, connections  # pylint: disable=import-outside-toplevel
+
+                close_old_connections()
+                try:
+                    function(*args, **kwargs)
+                finally:
+                    connections.close_all()
+
             def delay(*args: Any, **kwargs: Any) -> None:
-                thread = Thread(target=function, args=args, kwargs=kwargs, daemon=True)
+                thread = Thread(target=thread_target, args=args, kwargs=kwargs, daemon=True)
                 thread.start()
 
             # monkeypatch-add this method
