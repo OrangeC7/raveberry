@@ -87,10 +87,25 @@
     </div>
 
     <script>
+      async function pollMode() {
+        try {
+          const response = await fetch("/api/site-mode/", { cache: "no-store" });
+          if (!response.ok) return;
+          const data = await response.json();
+          if (data.mode === "afterhours") {
+            window.location.href = "/afterhours/";
+          }
+        } catch (_error) {
+          // silent retry
+        }
+      }
+    
       window.addEventListener('load', function() {
         document.body.classList.add('loaded');
         document.getElementById('player-card').classList.add('loaded');
       });
+    
+      setInterval(pollMode, 14000);
     </script>
   </body>
 </html>
