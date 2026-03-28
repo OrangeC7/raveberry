@@ -1,0 +1,84 @@
+"""OBS-friendly text exports for the currently playing song and queue."""
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+from typing import Any, Dict, Iterable, List
+
+from django.conf import settings as conf
+
+from core.musiq import song_utils
+
+LOGGER = logging.getLogger(__name__)
+MAX_QUEUE_FILES = 99
+
+
+def _stringify(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value)
+
+
+def _write_lines(path: Path, lines: Iterable[str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = "\n".join(_stringify(line) for line in lines) + "\n"
+    temp_path = path.with_suffix(path.suffix + ".tmp")
+    temp_path.write_text(payload, encoding="utf-8")
+    temp_path.replace(path)
+
+
+def _current_position_text(current_song: Dict[str, Any] | None, progress: Any) -> str:
+    if not current_song:
+        return ""
+    try:
+        duration = float(current_song.get("duration") or 0)
+        progress_percent = float(progress or 0)
+    except (TypeError, ValueError):
+        return ""
+    current_position = max(0.0, min(duration, duration * progress_percent / 100.0))
+    return song_utils.format_seconds(current_position)
+
+
+def write_from_state(state: Dict[str, Any]) -> None:
+    """Write songcurrent.txt and songqueue*.txt files for OBS / overlays."""
+    try:
+        musiq_state = state.get("musiq") or {}
+        current_song = musiq_state.get("currentSong")
+        progress = musiq_state.get("progress")
+        queue = list(musiq_state.get("songQueue") or [])[:MAX_QUEUE_FILES]
+
+        output_dir = Path(conf.FURATIC_OBS_OUTPUT_DIR).expanduser()
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        if current_song:
+            current_lines = [
+                _current_position_text(current_song, progress),
+                current_song.get("durationFormatted")
+                or song_utils.format_seconds(current_song.get("duration") or 0),
+                current_song.get("title") or current_song.get("name") or "",
+                current_song.get("artist") or "",
+                _stringify(current_song.get("votes") or 0),
+            ]
+        else:
+            current_lines = ["", "", "", "", ""]
+        _write_lines(output_dir / "songcurrent.txt", current_lines)
+
+        for index, song in enumerate(queue, start=1):
+            queue_lines = [
+                song.get("title") or song.get("name") or "",
+                song.get("artist") or "",
+                _stringify(song.get("votes") or 0),
+                song.get("durationFormatted")
+                or song_utils.format_seconds(song.get("duration") or 0),
+            ]
+            _write_lines(output_dir / f"songqueue{index}.txt", queue_lines)
+
+        for stale_path in output_dir.glob("songqueue*.txt"):
+            suffix = stale_path.stem.replace("songqueue", "")
+            if not suffix.isdigit():
+                continue
+            index = int(suffix)
+            if index < 1 or index > len(queue):
+                stale_path.unlink(missing_ok=True)
+    except Exception:  # pylint: disable=broad-except
+        LOGGER.exception("failed to write OBS export files")
