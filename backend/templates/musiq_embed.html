@@ -24,70 +24,217 @@
 
 {% block content %}
 <style>
+	:root {
+		--furatic-text: #eef4ff;
+		--furatic-muted: rgba(238, 244, 255, 0.72);
+		--furatic-border: rgba(255, 255, 255, 0.12);
+		--furatic-border-strong: rgba(255, 255, 255, 0.18);
+		--furatic-panel: rgba(7, 10, 22, 0.42);
+		--furatic-panel-strong: rgba(7, 10, 22, 0.62);
+		--furatic-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+	}
+
+	html,
+	body,
+	#content {
+		background: transparent !important;
+		color: var(--furatic-text) !important;
+	}
+
+	body {
+		padding: 0 !important;
+	}
+
 	.navbar,
 	#menu-container,
 	#hashtag-container,
 	#demo-banner,
 	#disconnected-banner,
 	#reconnected-banner,
-	#update-banner {
+	#update-banner,
+	#feedback-modal {
 		display: none !important;
 	}
 
 	#content {
-		padding-top: 0;
+		padding: 0 !important;
+	}
+
+	.furatic-embed-shell {
+		padding: 20px 18px 24px;
+	}
+
+	.list-group {
+		gap: 14px;
+		background: transparent !important;
+	}
+
+	#song-queue {
+		margin-top: 14px;
+	}
+
+	.list-group-item {
+		position: relative;
+		overflow: hidden;
+		border-radius: 22px !important;
+		border: 1px solid var(--furatic-border) !important;
+		background: var(--furatic-panel) !important;
+		box-shadow: var(--furatic-shadow);
+		-webkit-backdrop-filter: blur(24px) saturate(122%);
+		backdrop-filter: blur(24px) saturate(122%);
+		color: var(--furatic-text) !important;
+	}
+
+	.list-group-item::before {
+		content: "";
+		position: absolute;
+		inset: 1px;
+		border-radius: 21px;
+		background:
+			radial-gradient(circle at top left, rgba(255,255,255,0.08), transparent 32%),
+			linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0));
+		pointer-events: none;
+	}
+
+	#music-input-card {
+		padding: 8px 10px !important;
+	}
+
+	#music-input,
+	textarea,
+	.form-control,
+	input[type="text"],
+	input[type="search"] {
+		background: rgba(255,255,255,0.06) !important;
+		border-color: rgba(255,255,255,0.14) !important;
+		border-radius: 16px !important;
+		color: var(--furatic-text) !important;
+		box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+	}
+
+	#music-input::placeholder,
+	textarea::placeholder,
+	.form-control::placeholder {
+		color: var(--furatic-muted) !important;
+	}
+
+	#progress-bar-container {
+		padding: 0 !important;
+	}
+
+	#progress-bar-container > .progress {
+		background: rgba(255,255,255,0.08) !important;
+	}
+
+	#progress-bar {
+		background: linear-gradient(90deg, rgba(0, 142, 248, 0.92), rgba(200, 0, 224, 0.82)) !important;
+	}
+
+	.ui-autocomplete {
+		background: rgba(10, 14, 28, 0.96) !important;
+		border-color: rgba(255,255,255,0.12) !important;
+		color: var(--furatic-text) !important;
+		border-radius: 18px !important;
+		backdrop-filter: blur(24px) saturate(120%);
+	}
+
+	.ui-autocomplete > li.ui-state-focus {
+		background-color: rgba(255,255,255,0.10) !important;
+	}
+
+	#current-song-title,
+	#current-song-votes,
+	#total-time,
+	.queue-entry,
+	.queue-entry * {
+		color: var(--furatic-text) !important;
+	}
+
+	#stream-control,
+	#request-new-music,
+	#request-archived-music,
+	#random-suggestion,
+	#playlist-mode,
+	#clearbutton,
+	.vote-up,
+	.vote-down,
+	#song-control-icons i,
+	#queue-controls i,
+	#volume-indicator,
+	#external-link,
+	#title-modal i {
+		color: rgba(255,255,255,0.92) !important;
+	}
+
+	.modal-content {
+		background: var(--furatic-panel-strong) !important;
+		border-radius: 22px !important;
+		border: 1px solid var(--furatic-border-strong) !important;
+		backdrop-filter: blur(24px) saturate(120%);
+		color: var(--furatic-text) !important;
+	}
+
+	@media (max-width: 620px) {
+		.furatic-embed-shell {
+			padding: 16px 12px 20px;
+		}
+
+		.list-group-item {
+			border-radius: 18px !important;
+		}
 	}
 </style>
 
-<ul class="list-group">
-	<li class="list-group-item" id="music-input-card">
-		<span class="clearable">
-			<input class="form-control autocomplete" id="music-input" placeholder="Search for Music..." autofocus autocomplete="off">
-			<i class="fas fa-times" id="clearbutton"></i>
-		</span>
-		<div class="anim-container" id="request-button-container">
-			<i class="fas fa-arrow-circle-right other" id="request-archived-music"></i>
-			<i class="fas fa-search default" id="request-new-music"></i>
-		</div>
-	</li>
-</ul>
-<ul class="list-group" id="current-song-card">
-	<li class="list-group-item empty" id="current-song">
-		{% if show_stream %}
-			<audio>
-			</audio>
-			<i class="fas fa-volume-mute" id="stream-control"></i>
-		{% endif %}
-		<div class="autoscrolling-container" {%if show_stream%}style="margin-right:32px"{%endif%}><span id="current-song-title">Currently Empty</span></div>
-	</li>
-	<li class="list-group-item" id="progress-bar-container">
-		<div class="progress">
-			<div id="progress-bar" class="progress-bar">
+<div class="furatic-embed-shell">
+	<ul class="list-group">
+		<li class="list-group-item" id="music-input-card">
+			<span class="clearable">
+				<input class="form-control autocomplete" id="music-input" placeholder="Search for Music..." autofocus autocomplete="off">
+				<i class="fas fa-times" id="clearbutton"></i>
+			</span>
+			<div class="anim-container" id="request-button-container">
+				<i class="fas fa-arrow-circle-right other" id="request-archived-music"></i>
+				<i class="fas fa-search default" id="request-new-music"></i>
 			</div>
-		</div>
-	</li>
-	<li class="list-group-item" id="song-votes">
-		<div class="current-song-vote-indicators" id="current-song-upvote-indicators"></div>
-		<i class="fas fa-chevron-circle-up vote-up"></i>
-		<span id="current-song-votes"></span>
-		<i class="fas fa-chevron-circle-down vote-down"></i>
-		<div class="current-song-vote-indicators" id="current-song-downvote-indicators"></div>
-	</li>
-</ul>
-<ul class="list-group" id="song-queue">
-</ul>
+		</li>
+	</ul>
+	<ul class="list-group" id="current-song-card">
+		<li class="list-group-item empty" id="current-song">
+			{% if show_stream %}
+				<audio>
+				</audio>
+				<i class="fas fa-volume-mute" id="stream-control"></i>
+			{% endif %}
+			<div class="autoscrolling-container" {%if show_stream%}style="margin-right:32px"{%endif%}><span id="current-song-title">Currently Empty</span></div>
+		</li>
+		<li class="list-group-item" id="progress-bar-container">
+			<div class="progress">
+				<div id="progress-bar" class="progress-bar">
+				</div>
+			</div>
+		</li>
+		<li class="list-group-item" id="song-votes">
+			<div class="current-song-vote-indicators" id="current-song-upvote-indicators"></div>
+			<i class="fas fa-chevron-circle-up vote-up"></i>
+			<span id="current-song-votes"></span>
+			<i class="fas fa-chevron-circle-down vote-down"></i>
+			<div class="current-song-vote-indicators" id="current-song-downvote-indicators"></div>
+		</li>
+	</ul>
+	<ul class="list-group" id="song-queue">
+	</ul>
 
-<div id="title-modal" class="modal fade" role="dialog">
-	<div class="modal-dialog modal-dialog-centered">
-		<div class="modal-content">
-			<div class="modal-text">
-				Some text in the modal.
+	<div id="title-modal" class="modal fade" role="dialog">
+		<div class="modal-dialog modal-dialog-centered">
+			<div class="modal-content">
+				<div class="modal-text">
+					Some text in the modal.
+				</div>
+				<a target="_blank" rel="noopener" href="" id="external-link">
+					<i class="fas fa-link"></i>
+				</a>
 			</div>
-			<a target="_blank" rel="noopener" href="" id="external-link">
-				<i class="fas fa-link"></i>
-			</a>
 		</div>
 	</div>
 </div>
-
 {% endblock %}
