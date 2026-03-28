@@ -18,7 +18,7 @@ from django.utils import timezone
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.csrf import csrf_exempt
 
-from core import base, redis, site_mode, user_manager, util
+from core import base, obs_export, redis, site_mode, user_manager, util
 from core.models import CurrentSong, QueuedSong
 from core.musiq import controller, playback, song_utils
 from core.musiq.music_provider import MusicProvider, ProviderError, WrongUrlError
@@ -154,6 +154,18 @@ def request_music(request: WSGIRequest) -> HttpResponse:
 
     if query is None:
         return HttpResponseBadRequest("No query given")
+
+    requester_ip = user_manager.get_client_ip(request)
+    if storage.get("ip_checking"):
+        if playlist:
+            return HttpResponseBadRequest(
+                "Playlist requests are disabled while IP-based anti-spam is enabled."
+            )
+        if user_manager.ip_has_active_queue_slot(requester_ip):
+            return HttpResponseBadRequest(
+                "This IP address already has a song in the queue."
+            )
+
     key = None
     if key_param:
         key = int(key_param)
@@ -177,10 +189,19 @@ def request_music(request: WSGIRequest) -> HttpResponse:
             )
             return HttpResponseBadRequest("No placeholder was created")
         queue_key = queued_song.id
+        user_manager.remember_requester_ip(requester_ip, queue_key)
 
         if storage.get("ip_checking"):
             assert queue_key
-            user_manager.try_vote(user_manager.get_client_ip(request), queue_key, 1)
+            if not user_manager.claim_queue_slot(requester_ip, queue_key):
+                try:
+                    playback.queue.remove(queue_key)
+                except Exception:  # pylint: disable=broad-except
+                    queue.filter(id=queue_key).delete()
+                return HttpResponseBadRequest(
+                    "This IP address already has a song in the queue."
+                )
+            user_manager.try_vote(requester_ip, queue_key, 1)
 
         if storage.get("color_indication") != storage.Privileges.nobody:
             user_manager.register_song(request, queue_key)
@@ -374,5 +395,7 @@ def state_dict() -> Dict[str, Any]:
 
 
 def update_state() -> None:
-    """Sends an update event to all connected clients."""
-    send_state(state_dict())
+    """Sends an update event to all connected clients and refreshes OBS exports."""
+    state = state_dict()
+    obs_export.write_from_state(state)
+    send_state(state)
