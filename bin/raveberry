@@ -245,6 +245,13 @@ help        show this help and exit""",
 
         site_mode.set_mode(mode)
 
+    def _ensure_runtime_defaults(self) -> None:
+        self._ensure_django()
+        from core.settings import storage  # pylint: disable=import-outside-toplevel
+
+        storage.put("interactivity", storage.Interactivity.full_voting)
+        self._close_django_db_connections()
+
     @staticmethod
     def _status_text(mode: str) -> str:
         label = "Event Mode" if mode == "event" else "After Hours"
@@ -350,6 +357,7 @@ help        show this help and exit""",
             )
 
             self._set_site_mode("event")
+            self._ensure_runtime_defaults()
             admin_username, admin_password = self._ensure_runtime_admin_credentials()
             self._close_django_db_connections()
 
