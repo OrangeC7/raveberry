@@ -77,10 +77,7 @@ def seek_backward(_request: WSGIRequest) -> None:
         pass
 
 
-@control
-def play(_request: WSGIRequest) -> None:
-    """Resumes the current song if it is paused.
-    No-op if already playing."""
+def _resume() -> None:
     player.play()
     try:
         # move the creation timestamp into the future for the duration of the pause
@@ -95,6 +92,12 @@ def play(_request: WSGIRequest) -> None:
         pass
     storage.put("paused", False)
     redis.put("paused", False)
+
+@control
+def play(_request: WSGIRequest) -> None:
+    """Resumes the current song if it is paused.
+    No-op if already playing."""
+    _resume()
 
 
 def _pause() -> None:
