@@ -26,6 +26,10 @@ buzzer_stopped = redis.Event("buzzer_stopped")
 
 queue = models.QueuedSong.objects
 
+def request_operator_command(command: str) -> None:
+    """Send an operator command from the launcher process to the playback loop."""
+    redis.put("operator_command", command)
+    queue_changed.set()
 
 class PlaybackError(Exception):
     pass
@@ -83,6 +87,52 @@ class Playback:
     def player(self):
         return self.players[redis.get("active_player")]
 
+    def _handle_operator_command(self) -> str:
+        """Handle operator commands sent from the launcher process."""
+        command = str(redis.get("operator_command"))
+        if not command:
+            return ""
+
+        redis.put("operator_command", "")
+
+        if command == "pause_for_afterhours":
+            if models.CurrentSong.objects.exists() and not redis.get("paused"):
+                musiq.controller._pause()
+                musiq.update_state()
+            else:
+                storage.put("paused", True)
+                redis.put("paused", True)
+            return command
+
+        if command == "resume_from_afterhours":
+            if models.CurrentSong.objects.exists() and redis.get("paused"):
+                musiq.controller._resume()
+                musiq.update_state()
+            else:
+                storage.put("paused", False)
+                redis.put("paused", False)
+                queue_changed.set()
+            return command
+
+        if command == "clear_for_event":
+            try:
+                self.player().skip()
+            except Exception:  # pylint: disable=broad-except
+                pass
+
+            models.CurrentSong.objects.all().delete()
+            queue.all().delete()
+
+            storage.put("paused", False)
+            redis.put("paused", False)
+            redis.put("playing", False)
+            redis.put("backup_playing", False)
+
+            musiq.update_state()
+            return command
+
+        return ""
+    
     def play_alarm(self, interrupt=False, from_buzzer=True) -> None:
         """Play the alarm sound. If specified, interrupts the currently playing song."""
         redis.put("alarm_playing", True)
@@ -238,6 +288,10 @@ class Playback:
         # playback_ended.wait()
         error = False
         while True:
+            command = self._handle_operator_command()
+            if command == "clear_for_event":
+                return False
+
             current_song = CurrentSong.objects.get()
             try:
                 if self.player().should_stop_waiting(error):
@@ -314,6 +368,10 @@ class Playback:
         Takes a song from the queue and plays it until it is finished."""
 
         while True:
+            command = self._handle_operator_command()
+            if command == "clear_for_event":
+                continue
+
             if redis.get("playback_error"):
                 # sleep for a short while so continuing errors don't lead to busy loops
                 time.sleep(0.5)
