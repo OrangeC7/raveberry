@@ -1,17 +1,22 @@
 """This module manages and counts user accesses and handles permissions."""
-import re
-from ast import literal_eval
 import colorsys
+import ipaddress
 import random
+import re
+import secrets
 import time
+from ast import literal_eval
 from functools import wraps
-from typing import Callable, Optional
+from typing import Callable, Iterable, Optional
 
 import ipware
+from django.conf import settings as conf
+from django.contrib.auth import get_user_model
+from django.contrib.auth.views import redirect_to_login
 from django.contrib.sessions.models import Session
 from django.core.handlers.wsgi import WSGIRequest
 from django.db import transaction
-from django.http import HttpResponse, HttpResponseBadRequest
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.utils import timezone
 
 from core import redis
@@ -23,6 +28,104 @@ from core.settings.storage import Privileges
 from core.util import extract_value
 
 INACTIVITY_PERIOD = 600
+MODERATOR_GROUP_NAME = "moderator"
+QUEUE_SLOT_TTL_SECONDS = 7 * 24 * 60 * 60
+REQUESTER_IP_TTL_SECONDS = 7 * 24 * 60 * 60
+
+
+def _normalize_ip(value: str) -> str:
+    """Normalize an IPv4/IPv6 address and drop any port / wrapper syntax."""
+    if not value:
+        return ""
+
+    value = value.strip().strip('"').strip("'")
+    if not value:
+        return ""
+
+    if value.lower().startswith("for="):
+        value = value[4:]
+
+    if value.startswith("[") and "]" in value:
+        value = value[1 : value.index("]")]
+
+    if "%" in value:
+        value = value.split("%", 1)[0]
+
+    if value.count(":") == 1 and "." in value:
+        host, port = value.rsplit(":", 1)
+        if port.isdigit():
+            value = host
+
+    try:
+        return ipaddress.ip_address(value).compressed
+    except ValueError:
+        return ""
+
+
+def _normalize_ip_collection(values: Iterable[str]) -> list[str]:
+    normalized = {_normalize_ip(value) for value in values}
+    normalized.discard("")
+    return sorted(normalized)
+
+
+def _parse_forwarded_header(value: str) -> str:
+    if not value:
+        return ""
+    for candidate in value.split(","):
+        normalized = _normalize_ip(candidate)
+        if normalized:
+            return normalized
+    return ""
+
+
+def _parse_rfc_forwarded_header(value: str) -> str:
+    if not value:
+        return ""
+    matches = re.findall(
+        r'for=(?:"?)(\[[^\]]+\]|[^;,"\s]+)',
+        value,
+        flags=re.IGNORECASE,
+    )
+    for candidate in matches:
+        normalized = _normalize_ip(candidate)
+        if normalized:
+            return normalized
+    return ""
+
+
+def _extract_forwarded_ip(request: WSGIRequest) -> str:
+    for header_name in conf.CLIENT_IP_HEADER_CANDIDATES:
+        raw_value = request.META.get(header_name, "")
+        if not raw_value:
+            continue
+        if header_name == "HTTP_FORWARDED":
+            normalized = _parse_rfc_forwarded_header(raw_value)
+        else:
+            normalized = _parse_forwarded_header(raw_value)
+        if normalized:
+            return normalized
+    return ""
+
+
+def _trusted_proxy(remote_addr: str) -> bool:
+    normalized = _normalize_ip(remote_addr)
+    return bool(normalized and normalized in conf.TRUSTED_PROXY_IPS)
+
+
+def _resolve_client_ip(request: WSGIRequest) -> str:
+    direct_ip = _normalize_ip(request.META.get("REMOTE_ADDR", ""))
+
+    if direct_ip and _trusted_proxy(direct_ip):
+        forwarded_ip = _extract_forwarded_ip(request)
+        if forwarded_ip:
+            return forwarded_ip
+
+    request_ip, _ = ipware.get_client_ip(request)
+    normalized_ip = _normalize_ip(request_ip or "")
+    if normalized_ip:
+        return normalized_ip
+
+    return direct_ip
 
 
 def has_controls(user) -> bool:
@@ -32,20 +135,200 @@ def has_controls(user) -> bool:
 
 def is_admin(user) -> bool:
     """Determines whether the given user is the admin."""
-    return user.is_superuser
+    return bool(getattr(user, "is_superuser", False))
+
+
+def is_moderator(user) -> bool:
+    """Determines whether the given user belongs to the moderator role."""
+    if not getattr(user, "is_authenticated", False):
+        return False
+    return bool(user.groups.filter(name=MODERATOR_GROUP_NAME).exists())
+
+
+def can_moderate(user) -> bool:
+    """Determines whether the given user can access moderator tools."""
+    return is_admin(user) or is_moderator(user)
+
+
+def moderator_required(
+    func: Callable[[WSGIRequest], HttpResponse]
+) -> Callable[[WSGIRequest], HttpResponse]:
+    """Require an authenticated moderator or admin for the wrapped view."""
+
+    def _decorator(request: WSGIRequest, *args, **kwargs) -> HttpResponse:
+        if not getattr(request, "user", None) or not request.user.is_authenticated:
+            return redirect_to_login(request.get_full_path())
+        if not can_moderate(request.user):
+            return HttpResponseForbidden("Moderator access required")
+        return func(request, *args, **kwargs)
+
+    return wraps(func)(_decorator)
+
 
 def has_secret_controls(request: WSGIRequest) -> bool:
     """Determines whether this session was unlocked via the secret full-control route."""
-    return bool(getattr(request, "session", None) and request.session.get("secret_controls"))
+    return bool(
+        getattr(request, "session", None) and request.session.get("secret_controls")
+    )
+
 
 def has_privilege(user, privilege: Privileges):
     if privilege == Privileges.everybody:
         return True
-    elif privilege == Privileges.mod and has_controls(user):
+    if privilege == Privileges.mod and can_moderate(user):
         return True
-    elif privilege == Privileges.admin and is_admin(user):
+    if privilege == Privileges.admin and is_admin(user):
         return True
     return False
+
+
+def ensure_builtin_moderator() -> None:
+    """Create/update the built-in moderator account and rotate its password on startup."""
+    from django.contrib.auth.models import Group
+
+    UserModel = get_user_model()
+    username = conf.FURATIC_MOD_USERNAME
+    password = secrets.token_urlsafe(18)
+
+    group, _ = Group.objects.get_or_create(name=MODERATOR_GROUP_NAME)
+    user, _ = UserModel.objects.get_or_create(**{UserModel.USERNAME_FIELD: username})
+    user.is_active = True
+    if hasattr(user, "is_staff"):
+        user.is_staff = False
+    if hasattr(user, "is_superuser"):
+        user.is_superuser = False
+    user.set_password(password)
+    user.save()
+    user.groups.add(group)
+
+    print(
+        f"[FURATIC] Moderator login generated - username: {username} password: {password}"
+    )
+
+
+def _banned_ips_storage_key() -> str:
+    return str(storage.get("banned_ips"))
+
+
+def get_banned_ips() -> list[str]:
+    """Return the persisted banned IP list."""
+    raw_value = _banned_ips_storage_key()
+    return _normalize_ip_collection(re.split(r"[\s,]+", raw_value))
+
+
+def _store_banned_ips(ips: Iterable[str]) -> None:
+    storage.put("banned_ips", "\n".join(_normalize_ip_collection(ips)))
+
+
+def is_banned_ip(ip: str) -> bool:
+    normalized = _normalize_ip(ip)
+    return bool(normalized and normalized in set(get_banned_ips()))
+
+
+def ban_ip(ip: str) -> str:
+    """Persistently ban the given IP and return the normalized value."""
+    normalized = _normalize_ip(ip)
+    if not normalized:
+        raise ValueError("Invalid IP address")
+    banned_ips = set(get_banned_ips())
+    banned_ips.add(normalized)
+    _store_banned_ips(banned_ips)
+    return normalized
+
+
+def unban_ip(ip: str) -> str:
+    """Remove the given IP from the persistent ban list."""
+    normalized = _normalize_ip(ip)
+    if not normalized:
+        raise ValueError("Invalid IP address")
+    banned_ips = set(get_banned_ips())
+    banned_ips.discard(normalized)
+    _store_banned_ips(banned_ips)
+    return normalized
+
+
+def _queue_slot_key(request_ip: str) -> str:
+    return f"queue-slot:{request_ip}"
+
+
+def _requester_ip_key(queue_key: int) -> str:
+    return f"queue-requester:{queue_key}"
+
+
+def remember_requester_ip(request_ip: str, queue_key: int) -> None:
+    """Store requester IP metadata for moderator tooling and exports."""
+    normalized = _normalize_ip(request_ip)
+    if not normalized:
+        return
+    redis.connection.set(
+        _requester_ip_key(queue_key),
+        normalized,
+        ex=REQUESTER_IP_TTL_SECONDS,
+    )
+
+
+def get_song_requester_ip(queue_key: int) -> str:
+    """Return the requester IP stored for the given queue / current-song key."""
+    return redis.connection.get(_requester_ip_key(queue_key)) or ""
+
+
+def ip_has_active_queue_slot(request_ip: str) -> bool:
+    """Return whether the given IP currently owns a queued song slot."""
+    normalized = _normalize_ip(request_ip)
+    if not normalized:
+        return False
+    return bool(redis.connection.get(_queue_slot_key(normalized)))
+
+
+def claim_queue_slot(request_ip: str, queue_key: int) -> bool:
+    """Claim the single queued-song slot for the given IP.
+
+    Returns False if the IP already has another song in the queue.
+    """
+    normalized = _normalize_ip(request_ip)
+    if not normalized:
+        return True
+
+    remember_requester_ip(normalized, queue_key)
+    slot_key = _queue_slot_key(normalized)
+    requester_key = _requester_ip_key(queue_key)
+    allowed = True
+
+    def check_entry(pipe) -> None:
+        nonlocal allowed
+        existing = pipe.get(slot_key)
+        if existing not in (None, "", str(queue_key)):
+            allowed = False
+            return
+        allowed = True
+        pipe.multi()
+        pipe.set(slot_key, queue_key, ex=QUEUE_SLOT_TTL_SECONDS)
+        pipe.set(requester_key, normalized, ex=REQUESTER_IP_TTL_SECONDS)
+
+    redis.connection.transaction(check_entry, slot_key)
+    return allowed
+
+
+def release_queue_slot_for_song(queue_key: int) -> None:
+    """Release the active queue slot owned by the requester of the given song."""
+    requester_ip = get_song_requester_ip(queue_key)
+    if not requester_ip:
+        return
+
+    slot_key = _queue_slot_key(requester_ip)
+    current_value = redis.connection.get(slot_key)
+    pipe = redis.connection.pipeline()
+    if current_value == str(queue_key):
+        pipe.delete(slot_key)
+    pipe.expire(_requester_ip_key(queue_key), REQUESTER_IP_TTL_SECONDS)
+    pipe.execute()
+
+
+def clear_queue_slots() -> None:
+    """Clear all active single-song queue ownership locks."""
+    keys = list(redis.connection.scan_iter(match="queue-slot:*") )
+    if keys:
+        redis.connection.delete(*keys)
 
 
 def update_user_count() -> None:
@@ -75,15 +358,20 @@ def partymode_enabled() -> bool:
 
 def get_client_ip(request: WSGIRequest):
     """Returns the origin IP of a given request or "" if not possible."""
-    request_ip, _ = ipware.get_client_ip(request)
-    if request_ip is None:
-        request_ip = ""
-    return request_ip
+    cached_ip = getattr(request, "client_ip", None)
+    if cached_ip is not None:
+        return cached_ip
+    request_ip = _resolve_client_ip(request)
+    return request_ip or ""
 
 
 def try_vote(request_ip: str, queue_key: int, amount: int) -> bool:
     """If the user can not vote any more for the song into the given direction, return False.
     Otherwise, perform the vote and returns True."""
+    normalized = _normalize_ip(request_ip)
+    if not normalized:
+        return True
+
     # Votes are stored as individual (who, what) tuples in redis.
     # A mapping who -> [what, ...] is not used,
     # because each modification would require deserialization and subsequent serialization.
@@ -93,13 +381,26 @@ def try_vote(request_ip: str, queue_key: int, amount: int) -> bool:
     # looking up whether a single user voted for a single song, which is constant with tuples.
     # Since this feature indexes by the request IP and not the session_key,
     # it can not share its data structure with the votes for the color indicators.
-    entry = str((request_ip, queue_key))
+    entry = str((normalized, queue_key))
+    timestamp_key = f"vote-ts:{normalized}:{queue_key}"
     allowed = True
+    cooldown_seconds = float(storage.get("vote_change_cooldown_seconds"))
+    now = time.time()
 
     # redis transaction: https://github.com/Redis/redis-py#pipelines
     def check_entry(pipe) -> None:
         nonlocal allowed
         vote = pipe.get(entry)
+        last_change = pipe.get(timestamp_key)
+
+        if (
+            cooldown_seconds > 0
+            and last_change is not None
+            and now - float(last_change) < cooldown_seconds
+        ):
+            allowed = False
+            return
+
         if vote is None:
             new_vote = amount
         else:
@@ -111,8 +412,9 @@ def try_vote(request_ip: str, queue_key: int, amount: int) -> bool:
         # expire these entries to avoid accumulation over long runtimes.
         pipe.multi()
         pipe.set(entry, new_vote, ex=24 * 60 * 60)
+        pipe.set(timestamp_key, now, ex=24 * 60 * 60)
 
-    redis.connection.transaction(check_entry, entry)
+    redis.connection.transaction(check_entry, entry, timestamp_key)
     return allowed
 
 
@@ -225,8 +527,9 @@ def tracked(
             request.session.save()
 
         request_ip = get_client_ip(request)
+        activity_key = request_ip or request.session.session_key or "anonymous"
         last_requests = redis.get("last_requests")
-        last_requests[request_ip] = time.time()
+        last_requests[activity_key] = time.time()
         redis.put("last_requests", last_requests)
 
         def check():
