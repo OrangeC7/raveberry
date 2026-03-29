@@ -37,6 +37,29 @@ if not defined CONDA_PREFIX (
     exit /b 1
 )
 
+set "DJANGO_USE_SQLITE=0"
+set "POSTGRES_HOST=127.0.0.1"
+set "POSTGRES_PORT=54329"
+set "POSTGRES_DB=raveberry"
+set "POSTGRES_USER=raveberry"
+set "POSTGRES_PASSWORD=raveberry"
+set "PGPASSWORD=%POSTGRES_PASSWORD%"
+
+if not defined LOCALAPPDATA set "LOCALAPPDATA=%USERPROFILE%\AppData\Local"
+set "RAVEBERRY_PGROOT=%LOCALAPPDATA%\Raveberry\postgres"
+set "RAVEBERRY_PGDATA=%RAVEBERRY_PGROOT%\data"
+set "RAVEBERRY_PGLOG=%RAVEBERRY_PGROOT%\postgres.log"
+
+set "PATH=%CONDA_PREFIX%\Library\bin;%PATH%"
+
+call :ensure_local_postgres
+if errorlevel 1 (
+    echo.
+    echo [ERROR] PostgreSQL bootstrap failed.
+    pause
+    exit /b 1
+)
+
 set "RAVEBERRY_SCRIPT=%CONDA_PREFIX%\Scripts\raveberry"
 
 if not exist "%RAVEBERRY_SCRIPT%" (
@@ -96,3 +119,69 @@ if not "%RB_EXIT%"=="0" (
 )
 pause
 exit /b %RB_EXIT%
+
+:ensure_local_postgres
+where initdb >nul 2>&1
+if errorlevel 1 (
+    echo.
+    echo [INFO] Installing PostgreSQL server/client into the active Conda environment...
+    call conda install -y -c conda-forge postgresql psycopg2
+    if errorlevel 1 exit /b 1
+    set "PATH=%CONDA_PREFIX%\Library\bin;%PATH%"
+)
+
+python -c "import psycopg2" >nul 2>&1
+if errorlevel 1 (
+    echo.
+    echo [INFO] Installing psycopg2 into the active Conda environment...
+    call conda install -y -c conda-forge psycopg2
+    if errorlevel 1 exit /b 1
+)
+
+if not exist "%RAVEBERRY_PGROOT%" mkdir "%RAVEBERRY_PGROOT%"
+if errorlevel 1 exit /b 1
+
+if not exist "%RAVEBERRY_PGDATA%\PG_VERSION" (
+    echo.
+    echo [INFO] Initializing local PostgreSQL data directory...
+    initdb -D "%RAVEBERRY_PGDATA%" -U postgres -A trust
+    if errorlevel 1 exit /b 1
+
+    >> "%RAVEBERRY_PGDATA%\postgresql.conf" echo listen_addresses = '127.0.0.1'
+    >> "%RAVEBERRY_PGDATA%\postgresql.conf" echo port = %POSTGRES_PORT%
+)
+
+pg_isready -h %POSTGRES_HOST% -p %POSTGRES_PORT% -d postgres >nul 2>&1
+if errorlevel 1 (
+    echo.
+    echo [INFO] Starting local PostgreSQL...
+    pg_ctl -D "%RAVEBERRY_PGDATA%" -l "%RAVEBERRY_PGLOG%" -o "-p %POSTGRES_PORT%" -w start
+    if errorlevel 1 exit /b 1
+)
+
+timeout /t 2 /nobreak >nul
+
+pg_isready -h %POSTGRES_HOST% -p %POSTGRES_PORT% -d postgres >nul 2>&1
+if errorlevel 1 (
+    echo.
+    echo [ERROR] Local PostgreSQL is still not accepting connections after startup.
+    exit /b 1
+)
+
+psql -h %POSTGRES_HOST% -p %POSTGRES_PORT% -U postgres -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='%POSTGRES_USER%'" 2>nul | findstr /R "^[ ]*1[ ]*$" >nul
+if errorlevel 1 (
+    echo.
+    echo [INFO] Creating PostgreSQL role %POSTGRES_USER%...
+    psql -h %POSTGRES_HOST% -p %POSTGRES_PORT% -U postgres -d postgres -c "CREATE ROLE %POSTGRES_USER% LOGIN PASSWORD '%POSTGRES_PASSWORD%';"
+    if errorlevel 1 exit /b 1
+)
+
+psql -h %POSTGRES_HOST% -p %POSTGRES_PORT% -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='%POSTGRES_DB%'" 2>nul | findstr /R "^[ ]*1[ ]*$" >nul
+if errorlevel 1 (
+    echo.
+    echo [INFO] Creating PostgreSQL database %POSTGRES_DB%...
+    createdb -h %POSTGRES_HOST% -p %POSTGRES_PORT% -U postgres -O %POSTGRES_USER% %POSTGRES_DB%
+    if errorlevel 1 exit /b 1
+)
+
+exit /b 0
