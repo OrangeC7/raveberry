@@ -9,7 +9,6 @@ from ast import literal_eval
 from functools import wraps
 from typing import Callable, Iterable, Optional
 
-import ipware
 from django.conf import settings as conf
 from django.contrib.auth import get_user_model
 from django.contrib.auth.views import redirect_to_login
@@ -395,20 +394,57 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+from typing import Any, Callable, Iterable, Mapping, Optional
+
+
+def _extract_forwarded_ip(meta: Mapping[str, str]) -> str:
+    for header_name in conf.CLIENT_IP_HEADER_CANDIDATES:
+        raw_value = meta.get(header_name, "")
+        if not raw_value:
+            continue
+        if header_name == "HTTP_FORWARDED":
+            normalized = _parse_rfc_forwarded_header(raw_value)
+        else:
+            normalized = _parse_forwarded_header(raw_value)
+        if normalized:
+            return normalized
+    return ""
+
+
+def _resolve_client_ip_from_meta(meta: Mapping[str, str], remote_addr: str) -> str:
+    direct_ip = _normalize_ip(remote_addr)
+
+    if direct_ip and _trusted_proxy(direct_ip):
+        forwarded_ip = _extract_forwarded_ip(meta)
+        if forwarded_ip:
+            return forwarded_ip
+
+    return direct_ip
+
+
 def get_client_ip(request: WSGIRequest) -> str:
-    resolved = _resolve_client_ip(request) or ""
-    logger.warning(
-        "client-ip-debug resolved=%r remote=%r xff=%r x_real=%r forwarded=%r cf=%r true_client=%r x_client=%r",
-        resolved,
-        request.META.get("REMOTE_ADDR"),
-        request.META.get("HTTP_X_FORWARDED_FOR"),
-        request.META.get("HTTP_X_REAL_IP"),
-        request.META.get("HTTP_FORWARDED"),
-        request.META.get("HTTP_CF_CONNECTING_IP"),
-        request.META.get("HTTP_TRUE_CLIENT_IP"),
-        request.META.get("HTTP_X_CLIENT_IP"),
-    )
-    return resolved
+    return _resolve_client_ip_from_meta(
+        request.META,
+        request.META.get("REMOTE_ADDR", ""),
+    ) or ""
+
+
+def get_client_ip_from_scope(scope: Mapping[str, Any]) -> str:
+    meta: dict[str, str] = {}
+
+    for key, value in scope.get("headers", []):
+        if isinstance(key, bytes):
+            key = key.decode("latin1")
+        if isinstance(value, bytes):
+            value = value.decode("latin1")
+        meta["HTTP_" + key.upper().replace("-", "_")] = value
+
+    client = scope.get("client")
+    remote_addr = ""
+    if client and len(client) >= 1:
+        remote_addr = str(client[0])
+
+    return _resolve_client_ip_from_meta(meta, remote_addr) or ""
 
 
 def try_vote(request_ip: str, queue_key: int, amount: int) -> bool:
