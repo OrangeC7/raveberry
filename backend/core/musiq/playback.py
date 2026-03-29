@@ -207,7 +207,11 @@ class Playback:
             storage.Interactivity.full_voting,
         ]:
             with transaction.atomic():
-                song = queue.confirmed().order_by("-votes", "index")[0]
+                song = queue.confirmed().order_by("-votes", "index").first()
+                if song is None:
+                    queue_changed.wait()
+                    queue_changed.clear()
+                    return None, False
                 song_id = song.id
                 queue.remove(song.id)
         elif storage.get("shuffle"):
