@@ -424,7 +424,7 @@ help        show this help and exit""",
         spec = importlib.util.find_spec("django")
         if spec is None:
             print("Please install required dependencies:")
-            print("\tpip3 install raveberry[run]")
+            print("\t pip3 install raveberry[run]")
             sys.exit(1)
 
         if not os.path.isfile("db.sqlite3"):
@@ -449,18 +449,18 @@ help        show this help and exit""",
 
             self._set_site_mode("event")
             self._ensure_runtime_defaults()
-            
+
             admin_username, admin_password = self._ensure_runtime_admin_credentials()
             moderator_username, moderator_password = self._ensure_runtime_moderator_credentials()
-            
+
             self._close_django_db_connections()
-            
+
             admin_link = self._login_link("/admin/")
             moderator_link = self._login_link("/moderator/")
-            
+
             if os.name == "nt":
                 self.console_lock = threading.Lock()
-            
+
                 self._print_login_block(
                     "ADMIN",
                     admin_link,
@@ -473,7 +473,7 @@ help        show this help and exit""",
                     moderator_username,
                     moderator_password,
                 )
-            
+
                 server = subprocess.Popen(
                     [sys.executable, "manage.py", "runserver", "127.0.0.1:8080", "--noreload"],
                     env={
@@ -503,41 +503,12 @@ help        show this help and exit""",
                     moderator_username,
                     moderator_password,
                 )
-            
-                subprocess.call(
-                    [sys.executable, "manage.py", "runserver", "127.0.0.1:8080"],
-                    env={"DJANGO_DEBUG": "1", **additional_env, **os.environ},
-                )
-
-                server = subprocess.Popen(
-                    [sys.executable, "manage.py", "runserver", "127.0.0.1:8080", "--noreload"],
-                    env={
-                        "DJANGO_DEBUG": "1",
-                        "PYTHONUNBUFFERED": "1",
-                        **additional_env,
-                        **os.environ,
-                    },
-                    stdin=subprocess.DEVNULL,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    bufsize=1,
-                )
-
-                time.sleep(0.75)
-                self._handle_windows_controls(server)
-            else:
-                self._print_login_block(
-                    "ADMIN",
-                    "http://127.0.0.1:8080/admin/",
-                    admin_username,
-                    admin_password,
-                )
 
                 subprocess.call(
                     [sys.executable, "manage.py", "runserver", "127.0.0.1:8080"],
                     env={"DJANGO_DEBUG": "1", **additional_env, **os.environ},
                 )
+
         except KeyboardInterrupt:
             pass
         finally:
@@ -550,6 +521,7 @@ help        show this help and exit""",
 
             if mopidy:
                 mopidy.terminate()
+
             if celery:
                 subprocess.call(["pkill", "-9", "-f", "celery -A core.tasks"])
 
@@ -600,8 +572,6 @@ help        show this help and exit""",
         assert self.used_config
         assert self.default_config
         if self.used_config != self.default_config:
-            # If the user provided a different config, copy it to the default config's location,
-            # so it is available for upgrades after the install.
             shutil.copyfile(self.used_config, self.default_config)
 
         with open(self.used_config, encoding="utf-8") as config_file:
@@ -613,15 +583,12 @@ help        show this help and exit""",
     def _set_admin_password(
         config: Dict[str, Any], use_default_password: bool = False
     ) -> None:
-        # the sudo in this command allows ansible
-        # to become root without entering the password a second time
         db_exists = not subprocess.call(
             'sudo -u postgres psql -lqt | cut -d \\| -f 1 | grep -qw "raveberry"',
             shell=True,
             stderr=subprocess.DEVNULL,
         )
         if config["db_backup"] or db_exists:
-            # another database is already present, do not ask for a new admin password
             pass
         else:
             if use_default_password:
