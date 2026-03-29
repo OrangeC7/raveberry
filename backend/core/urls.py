@@ -55,6 +55,11 @@ urlpatterns: List[Union[URLPattern, URLResolver]] = [
                                 moderation.remove_song,
                                 name="moderator-remove-song",
                             ),
+                            path(
+                                "skip-current/",
+                                moderation.skip_current_song,
+                                name="moderator-skip-current",
+                            ),
                             path("ban-ip/", moderation.ban_ip, name="moderator-ban-ip"),
                             path(
                                 "unban-ip/",
