@@ -7,6 +7,7 @@ from channels.generic.websocket import WebsocketConsumer
 from channels.layers import get_channel_layer
 from django.core.handlers.wsgi import WSGIRequest
 from django.http import JsonResponse
+from core import user_manager
 
 
 def send_state(state: Dict[str, Any]) -> None:
@@ -26,6 +27,13 @@ class StateConsumer(WebsocketConsumer):
     """Handles connections with websocket clients."""
 
     def connect(self) -> None:
+        client_ip = user_manager.get_client_ip_from_scope(self.scope)
+
+        if client_ip and user_manager.is_banned_ip(client_ip):
+            self.close(code=4003)
+            return
+
+        self.client_ip = client_ip
         async_to_sync(self.channel_layer.group_add)("state", self.channel_name)
         self.accept()
 
