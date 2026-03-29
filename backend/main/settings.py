@@ -359,6 +359,25 @@ LOGGING = {
             "maxBytes": 1024 * 1024 * 15,  # 15MB
             "backupCount": 10,
         },
+        "errorfile": {
+            "level": "ERROR",
+            "formatter": "precise",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": os.path.join(BASE_DIR, "logs/error.log"),
+            "maxBytes": 1024 * 1024 * 15,  # 15MB
+            "backupCount": 10,
+        },
+        "console": {
+            "level": "INFO",
+            "formatter": "brief",
+            "class": "logging.StreamHandler",
+        },
+        "docker": {
+            "level": "INFO",
+            "formatter": "precise",
+            "class": "logging.StreamHandler",
+        },
+    },
     "loggers": {
         "django.server": {
             "handlers": ["console"],
@@ -384,24 +403,6 @@ LOGGING = {
             "handlers": ["console"],
             "level": "WARNING",
             "propagate": False,
-        },
-        "errorfile": {
-            "level": "ERROR",
-            "formatter": "precise",
-            "class": "logging.handlers.RotatingFileHandler",
-            "filename": os.path.join(BASE_DIR, "logs/error.log"),
-            "maxBytes": 1024 * 1024 * 15,  # 15MB
-            "backupCount": 10,
-        },
-        "console": {
-            "level": "INFO",
-            "formatter": "brief",
-            "class": "logging.StreamHandler",
-        },
-        "docker": {
-            "level": "INFO",
-            "formatter": "precise",
-            "class": "logging.StreamHandler",
         },
     },
     "root": {
