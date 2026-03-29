@@ -182,7 +182,7 @@ def has_privilege(user, privilege: Privileges):
     return False
 
 
-def ensure_builtin_moderator() -> None:
+def ensure_builtin_moderator() -> tuple[str, str]:
     """Create/update the built-in moderator account and rotate its password on startup."""
     from django.contrib.auth.models import Group
 
@@ -201,9 +201,7 @@ def ensure_builtin_moderator() -> None:
     user.save()
     user.groups.add(group)
 
-    print(
-        f"[FURATIC] Moderator login generated - username: {username} password: {password}"
-    )
+    return username, password
 
 
 def _banned_ips_storage_key() -> str:
