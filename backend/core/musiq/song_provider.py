@@ -21,6 +21,9 @@ from core.musiq.music_provider import MusicProvider, WrongUrlError, ProviderErro
 from core.musiq.song_utils import Metadata
 from core.settings import storage
 
+import time
+from django.db import OperationalError
+
 
 class SongProvider(MusicProvider):
     """The base class for all single song providers."""
@@ -277,31 +280,42 @@ class SongProvider(MusicProvider):
 
     def persist(self, session_key: str, archive: bool = True) -> None:
         metadata = self.get_metadata()
-
-        # Increase counter of song/playlist
-        with transaction.atomic():
-            queryset = ArchivedSong.objects.filter(url=metadata["external_url"])
-            if queryset.count() == 0:
-                initial_counter = 1 if archive else 0
-                assert metadata["external_url"]
-                archived_song = ArchivedSong.objects.create(
-                    url=metadata["external_url"],
-                    artist=metadata["artist"],
-                    title=metadata["title"],
-                    duration=metadata["duration"],
-                    counter=initial_counter,
-                    cached=metadata["cached"],
-                )
-            else:
-                if archive:
-                    queryset.update(counter=F("counter") + 1)
-                archived_song = queryset.get()
-
-            if archive:
-                ArchivedQuery.objects.get_or_create(
-                    song=archived_song, query=self.query
-                )
-
+    
+        last_error = None
+        for attempt in range(5):
+            try:
+                # Increase counter of song/playlist
+                with transaction.atomic():
+                    queryset = ArchivedSong.objects.filter(url=metadata["external_url"])
+                    if queryset.count() == 0:
+                        initial_counter = 1 if archive else 0
+                        assert metadata["external_url"]
+                        archived_song = ArchivedSong.objects.create(
+                            url=metadata["external_url"],
+                            artist=metadata["artist"],
+                            title=metadata["title"],
+                            duration=metadata["duration"],
+                            counter=initial_counter,
+                            cached=metadata["cached"],
+                        )
+                    else:
+                        if archive:
+                            queryset.update(counter=F("counter") + 1)
+                        archived_song = queryset.get()
+    
+                    if archive:
+                        ArchivedQuery.objects.get_or_create(
+                            song=archived_song, query=self.query
+                        )
+                break
+            except OperationalError as exc:
+                if "database is locked" not in str(exc).lower():
+                    raise
+                last_error = exc
+                time.sleep(0.2 * (attempt + 1))
+        else:
+            raise last_error
+    
         if storage.get("logging_enabled") and session_key:
             RequestLog.objects.create(song=archived_song, session_key=session_key)
 
