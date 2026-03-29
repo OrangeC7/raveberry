@@ -83,8 +83,8 @@ trusted_proxy_ips:
   - 127.0.0.1
   - ::1
 
-furatic_discord_invite_url:
-furatic_vrchat_group_url:
+furatic_discord_invite_url: https://discord.gg/Sr4pAFa8E5
+furatic_vrchat_group_url: https://vrchat.com/home/group/grp_abb22096-1394-451f-bb13-0e4f9d63b9fb
 furatic_hls_url: https://aux.furatic.xyz:8888/live/index.m3u8
 furatic_logo_square_url: https://raw.githubusercontent.com/OrangeC7/raveberry/master/FuraticLogo.svg
 furatic_logo_wide_url: https://raw.githubusercontent.com/OrangeC7/raveberry/master/FuraticLogoWide.svg
