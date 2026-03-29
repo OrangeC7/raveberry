@@ -17,36 +17,67 @@
         --text: #eef4ff;
         --muted: rgba(238, 244, 255, 0.72);
         --line: rgba(255, 255, 255, 0.12);
-        --panel: rgba(7, 10, 22, 0.28);
-        --panel-strong: rgba(7, 10, 22, 0.54);
-        --shadow: 0 24px 80px rgba(0, 0, 0, 0.46);
-        --radius: 26px;
+        --panel: rgba(7, 10, 22, 0.30);
+        --panel-shadow: 0 28px 120px rgba(0, 0, 0, 0.50);
+        --radius: 30px;
       }
 
       * {
         box-sizing: border-box;
       }
 
-      html,
-      body {
+      html, body {
         width: 100%;
         min-height: 100%;
         margin: 0;
-        background:
-          radial-gradient(circle at top, rgba(16, 24, 52, 0.92) 0%, rgba(5, 8, 22, 0.96) 48%, rgba(3, 4, 11, 1) 100%),
-          linear-gradient(180deg, var(--bg-top) 0%, var(--bg) 56%, var(--bg-bottom) 100%);
+        background: var(--bg);
         color: var(--text);
         font-family: Inter, Roboto, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
-        background-attachment: fixed;
       }
 
       body {
+        position: relative;
         overflow-x: hidden;
       }
 
+      #aurora {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+        z-index: 0;
+        background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg) 56%, var(--bg-bottom) 100%);
+        transform: translateZ(0);
+      }
+
+      .noise,
+      .vignette {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 1;
+      }
+
+      .noise {
+        opacity: 0.045;
+        background-image:
+          radial-gradient(circle at 20% 20%, rgba(255,255,255,0.12) 0, rgba(255,255,255,0) 34%),
+          radial-gradient(circle at 80% 0%, rgba(255,255,255,0.08) 0, rgba(255,255,255,0) 28%);
+        mix-blend-mode: screen;
+      }
+
+      .vignette {
+        background:
+          radial-gradient(circle at 50% -10%, rgba(255,255,255,0.06), transparent 42%),
+          radial-gradient(circle at 50% 50%, transparent 0%, transparent 54%, rgba(0,0,0,0.22) 100%);
+      }
+
       .page {
+        position: relative;
+        z-index: 2;
         min-height: 100svh;
-        padding: 18px 16px 24px;
+        padding: clamp(18px, 3vw, 28px);
         display: grid;
         place-items: start center;
       }
@@ -54,7 +85,17 @@
       .shell {
         width: min(100%, 1080px);
         display: grid;
-        gap: 14px;
+        gap: 16px;
+        opacity: 0;
+        transform: translateY(18px) scale(0.985);
+        transition:
+          opacity 720ms cubic-bezier(0.22, 1, 0.36, 1),
+          transform 900ms cubic-bezier(0.22, 1, 0.36, 1);
+      }
+
+      body.is-ready .shell {
+        opacity: 1;
+        transform: translateY(0) scale(1);
       }
 
       .brand {
@@ -71,15 +112,15 @@
         height: auto;
         margin: 0 auto;
         filter:
-          drop-shadow(0 16px 38px rgba(0, 0, 0, 0.30))
-          drop-shadow(0 0 18px rgba(0, 142, 248, 0.12));
+          drop-shadow(0 18px 42px rgba(0,0,0,0.28))
+          drop-shadow(0 0 22px rgba(0,142,248,0.12));
       }
 
       .notify-row {
         display: flex;
         flex-wrap: wrap;
         justify-content: center;
-        gap: 10px;
+        gap: 12px;
       }
 
       .notify-button,
@@ -88,25 +129,26 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-height: 44px;
-        padding: 0 16px;
-        border-radius: 14px;
+        gap: 10px;
+        min-height: 46px;
+        padding: 0 18px;
+        border-radius: 16px;
         color: var(--text);
         text-decoration: none;
-        font: inherit;
         font-weight: 700;
         letter-spacing: 0.01em;
-        border: 1px solid var(--line);
-        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255,255,255,0.12);
+        background: rgba(255,255,255,0.06);
         box-shadow:
-          inset 0 1px 0 rgba(255, 255, 255, 0.04),
-          0 12px 28px rgba(0, 0, 0, 0.22);
+          inset 0 1px 0 rgba(255,255,255,0.04),
+          0 10px 28px rgba(0,0,0,0.24);
         transition:
           transform 180ms ease,
           border-color 180ms ease,
           background 180ms ease,
           box-shadow 180ms ease,
           opacity 180ms ease;
+        font: inherit;
         cursor: pointer;
       }
 
@@ -114,11 +156,11 @@
       .tv-button:hover,
       .mini-button:hover {
         transform: translateY(-1px);
-        border-color: rgba(255, 255, 255, 0.18);
-        background: rgba(255, 255, 255, 0.09);
+        border-color: rgba(255,255,255,0.18);
+        background: rgba(255,255,255,0.09);
         box-shadow:
-          inset 0 1px 0 rgba(255, 255, 255, 0.05),
-          0 16px 34px rgba(0, 0, 0, 0.28);
+          inset 0 1px 0 rgba(255,255,255,0.05),
+          0 16px 34px rgba(0,0,0,0.28);
       }
 
       .notify-button.is-disabled {
@@ -128,13 +170,38 @@
 
       .player-card,
       .tv-panel {
-        border-radius: var(--radius);
-        border: 1px solid var(--line);
-        background: var(--panel);
-        box-shadow: var(--shadow);
-        -webkit-backdrop-filter: blur(20px) saturate(120%);
-        backdrop-filter: blur(20px) saturate(120%);
+        position: relative;
         overflow: hidden;
+        isolation: isolate;
+        border-radius: var(--radius);
+        background: rgba(6, 10, 22, 0.25);
+        border: 1px solid rgba(255, 255, 255, 0.10);
+        box-shadow: var(--panel-shadow);
+        -webkit-backdrop-filter: blur(28px) saturate(118%);
+        backdrop-filter: blur(28px) saturate(118%);
+      }
+
+      .player-card::before,
+      .tv-panel::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: -2;
+        background: rgba(255, 255, 255, 0.018);
+      }
+
+      .player-card::after,
+      .tv-panel::after {
+        content: "";
+        position: absolute;
+        inset: 1px;
+        border-radius: calc(var(--radius) - 1px);
+        z-index: -1;
+        background:
+          radial-gradient(circle at top left, rgba(255,255,255,0.10), transparent 30%),
+          linear-gradient(180deg, rgba(255,255,255,0.018), rgba(255,255,255,0));
+        opacity: 0.8;
+        pointer-events: none;
       }
 
       .player-stage {
@@ -152,20 +219,20 @@
 
       .tv-button {
         position: absolute;
-        right: 14px;
-        bottom: 14px;
-        z-index: 2;
-        background: rgba(5, 8, 18, 0.72);
+        right: 18px;
+        bottom: 18px;
+        z-index: 3;
+        background: rgba(8, 12, 24, 0.58);
       }
 
       .tv-panel {
+        padding: 18px;
         display: none;
-        padding: 16px;
+        gap: 12px;
       }
 
       .tv-panel.is-open {
         display: grid;
-        gap: 12px;
       }
 
       .tv-panel-head {
@@ -178,7 +245,7 @@
 
       .tv-panel h2 {
         margin: 0;
-        font-size: 18px;
+        font-size: 20px;
         letter-spacing: -0.02em;
       }
 
@@ -190,39 +257,50 @@
       .tv-video {
         width: 100%;
         aspect-ratio: 16 / 9;
-        border-radius: 18px;
-        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 22px;
         background: rgba(0, 0, 0, 0.42);
+        border: 1px solid rgba(255,255,255,0.10);
       }
 
       .footnote {
-        color: rgba(238, 244, 255, 0.56);
+        color: rgba(238, 244, 255, 0.58);
         font-size: 13px;
       }
 
-      @media (max-width: 640px) {
+      @media (max-width: 860px) {
+        iframe {
+          height: min(72vh, 760px);
+        }
+      }
+
+      @media (max-width: 620px) {
         .page {
           padding: 14px 10px 18px;
-        }
-
-        .notify-row {
-          width: 100%;
-        }
-
-        .notify-button {
-          flex: 1 1 0;
         }
 
         iframe {
           height: 78vh;
         }
       }
+
+      @media (prefers-reduced-motion: reduce) {
+        .shell,
+        .notify-button,
+        .tv-button,
+        .mini-button {
+          transition: none;
+        }
+      }
     </style>
   </head>
   <body>
+    <canvas id="aurora" aria-hidden="true"></canvas>
+    <div class="noise" aria-hidden="true"></div>
+    <div class="vignette" aria-hidden="true"></div>
+
     <main class="page">
-      <div class="shell">
-        <header class="brand">
+      <section class="shell" aria-labelledby="title">
+        <div class="brand">
           <img src="{{ furatic_logo_wide_url }}" alt="FURATIC" decoding="async">
           <div class="notify-row">
             <a
@@ -242,9 +320,9 @@
               VRChat group
             </a>
           </div>
-        </header>
+        </div>
 
-        <section class="player-card">
+        <div class="player-card">
           <div class="player-stage">
             <iframe
               src="/p/"
@@ -254,26 +332,267 @@
             ></iframe>
             <button class="tv-button" id="tv-toggle" type="button">TV</button>
           </div>
-        </section>
+        </div>
 
-        <section class="tv-panel" id="tv-panel" aria-hidden="true">
+        <div class="tv-panel" id="tv-panel" aria-hidden="true">
           <div class="tv-panel-head">
             <div>
               <h2>Live TV feed</h2>
-              <p>Open the stream without leaving the queue page.</p>
+              <p>Open the HLS feed without leaving the queue page.</p>
             </div>
             <button class="mini-button" id="tv-close" type="button">Close</button>
           </div>
           <video id="tv-player" class="tv-video" controls playsinline preload="none"></video>
-          {% if hls_url %}
           <div class="footnote">Stream source: {{ hls_url }}</div>
-          {% endif %}
-        </section>
-      </div>
+        </div>
+      </section>
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
     <script>
+      (function () {
+        const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        const canvas = document.getElementById("aurora");
+        const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+
+        let width = 0;
+        let height = 0;
+        let dpr = 1;
+        let rafId = 0;
+
+        const orbs = [
+          {
+            color: [0, 142, 248],
+            radius: 396,
+            alpha: 0.24,
+            xMulA: 0.28,
+            xMulB: 0.12,
+            yMulA: 0.23,
+            yMulB: 0.07,
+            speedA: 0.13,
+            speedB: 0.23,
+            speedC: 0.16,
+            speedD: 0.10,
+            phaseA: 0.2,
+            phaseB: 1.7,
+            phaseC: 2.6,
+            phaseD: 0.5
+          },
+          {
+            color: [200, 0, 224],
+            radius: 364,
+            alpha: 0.22,
+            xMulA: 0.24,
+            xMulB: 0.10,
+            yMulA: 0.25,
+            yMulB: 0.07,
+            speedA: 0.10,
+            speedB: 0.20,
+            speedC: 0.15,
+            speedD: 0.10,
+            phaseA: 2.3,
+            phaseB: 0.7,
+            phaseC: 1.2,
+            phaseD: 2.1
+          },
+          {
+            color: [222, 104, 0],
+            radius: 322,
+            alpha: 0.18,
+            xMulA: 0.20,
+            xMulB: 0.13,
+            yMulA: 0.20,
+            yMulB: 0.09,
+            speedA: 0.14,
+            speedB: 0.18,
+            speedC: 0.12,
+            speedD: 0.08,
+            phaseA: 1.0,
+            phaseB: 2.8,
+            phaseC: 0.3,
+            phaseD: 1.6
+          },
+          {
+            color: [74, 227, 0],
+            radius: 250,
+            alpha: 0.09,
+            xMulA: 0.14,
+            xMulB: 0.07,
+            yMulA: 0.15,
+            yMulB: 0.06,
+            speedA: 0.08,
+            speedB: 0.15,
+            speedC: 0.10,
+            speedD: 0.06,
+            phaseA: 3.2,
+            phaseB: 1.1,
+            phaseC: 1.8,
+            phaseD: 2.7
+          },
+          {
+            color: [0, 142, 248],
+            radius: 252,
+            alpha: 0.11,
+            xMulA: 0.12,
+            xMulB: 0.16,
+            yMulA: 0.11,
+            yMulB: 0.08,
+            speedA: 0.17,
+            speedB: 0.12,
+            speedC: 0.11,
+            speedD: 0.14,
+            phaseA: 1.4,
+            phaseB: 2.4,
+            phaseC: 0.9,
+            phaseD: 3.1
+          },
+          {
+            color: [222, 104, 0],
+            radius: 232,
+            alpha: 0.10,
+            xMulA: 0.17,
+            xMulB: 0.09,
+            yMulA: 0.12,
+            yMulB: 0.11,
+            speedA: 0.09,
+            speedB: 0.16,
+            speedC: 0.18,
+            speedD: 0.12,
+            phaseA: 2.9,
+            phaseB: 0.4,
+            phaseC: 2.2,
+            phaseD: 1.3
+          }
+        ];
+
+        function resizeCanvas() {
+          width = window.innerWidth;
+          height = window.innerHeight;
+          dpr = Math.min(window.devicePixelRatio || 1, 1.6);
+
+          canvas.width = Math.round(width * dpr);
+          canvas.height = Math.round(height * dpr);
+          canvas.style.width = width + "px";
+          canvas.style.height = height + "px";
+
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
+
+        function drawBase() {
+          const gradient = ctx.createLinearGradient(0, 0, 0, height);
+          gradient.addColorStop(0, "#091022");
+          gradient.addColorStop(0.58, "#050816");
+          gradient.addColorStop(1, "#03040b");
+          ctx.fillStyle = gradient;
+          ctx.fillRect(0, 0, width, height);
+
+          const centerGlow = ctx.createRadialGradient(
+            width * 0.5,
+            height * 0.35,
+            0,
+            width * 0.5,
+            height * 0.35,
+            Math.max(width, height) * 0.75
+          );
+          centerGlow.addColorStop(0, "rgba(255,255,255,0.030)");
+          centerGlow.addColorStop(1, "rgba(255,255,255,0)");
+          ctx.fillStyle = centerGlow;
+          ctx.fillRect(0, 0, width, height);
+        }
+
+        function drawOrb(x, y, radius, rgb, alpha) {
+          const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+          gradient.addColorStop(0, `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`);
+          gradient.addColorStop(0.38, `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha * 0.64})`);
+          gradient.addColorStop(0.72, `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha * 0.18})`);
+          gradient.addColorStop(1, `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0)`);
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+          ctx.arc(x, y, radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        function render(now) {
+          const t = now * 0.0014;
+          drawBase();
+
+          ctx.globalCompositeOperation = "screen";
+
+          for (const orb of orbs) {
+            const x = width * (
+              0.5
+              + orb.xMulA * Math.sin(t * orb.speedA + orb.phaseA)
+              + orb.xMulB * Math.sin(t * orb.speedB + orb.phaseB)
+            );
+
+            const y = height * (
+              0.5
+              + orb.yMulA * Math.cos(t * orb.speedC + orb.phaseC)
+              + orb.yMulB * Math.sin(t * orb.speedD + orb.phaseD)
+            );
+
+            const radius = orb.radius * (
+              1
+              + 0.09 * Math.sin(t * (orb.speedA + orb.speedC + orb.speedD * 0.5) + orb.phaseB)
+            );
+
+            drawOrb(x, y, radius, orb.color, orb.alpha);
+          }
+
+          ctx.globalCompositeOperation = "source-over";
+
+          const scrim = ctx.createLinearGradient(0, 0, 0, height);
+          scrim.addColorStop(0, "rgba(0,0,0,0.08)");
+          scrim.addColorStop(0.45, "rgba(0,0,0,0.02)");
+          scrim.addColorStop(1, "rgba(0,0,0,0.16)");
+          ctx.fillStyle = scrim;
+          ctx.fillRect(0, 0, width, height);
+
+          rafId = window.requestAnimationFrame(render);
+        }
+
+        resizeCanvas();
+
+        if (prefersReducedMotion) {
+          drawBase();
+          ctx.globalCompositeOperation = "screen";
+          drawOrb(width * 0.24, height * 0.28, 300, [0, 142, 248], 0.18);
+          drawOrb(width * 0.76, height * 0.24, 290, [200, 0, 224], 0.18);
+          drawOrb(width * 0.28, height * 0.78, 250, [74, 227, 0], 0.10);
+          drawOrb(width * 0.78, height * 0.74, 270, [222, 104, 0], 0.14);
+          ctx.globalCompositeOperation = "source-over";
+        } else {
+          rafId = window.requestAnimationFrame(render);
+        }
+
+        let resizeTimer = 0;
+        window.addEventListener("resize", function () {
+          window.clearTimeout(resizeTimer);
+          resizeTimer = window.setTimeout(function () {
+            resizeCanvas();
+            if (prefersReducedMotion) {
+              drawBase();
+              ctx.globalCompositeOperation = "screen";
+              drawOrb(width * 0.24, height * 0.28, 300, [0, 142, 248], 0.18);
+              drawOrb(width * 0.76, height * 0.24, 290, [200, 0, 224], 0.18);
+              drawOrb(width * 0.28, height * 0.78, 250, [74, 227, 0], 0.10);
+              drawOrb(width * 0.78, height * 0.74, 270, [222, 104, 0], 0.14);
+              ctx.globalCompositeOperation = "source-over";
+            }
+          }, 80);
+        }, { passive: true });
+
+        window.addEventListener("beforeunload", function () {
+          if (rafId) {
+            window.cancelAnimationFrame(rafId);
+          }
+        });
+
+        window.requestAnimationFrame(function () {
+          document.body.classList.add("is-ready");
+        });
+      })();
+
       (function () {
         const hlsUrl = "{{ hls_url|default_if_none:''|escapejs }}";
         const panel = document.getElementById("tv-panel");
@@ -283,18 +602,26 @@
         let hlsInstance = null;
         let hasLoadedStream = false;
 
+        function canUseNativeHls() {
+          return video.canPlayType("application/vnd.apple.mpegurl");
+        }
+
+        function canUseHlsJs() {
+          return Boolean(window.Hls && window.Hls.isSupported());
+        }
+
         function ensureStream() {
           if (hasLoadedStream || !hlsUrl) {
             return;
           }
           hasLoadedStream = true;
 
-          if (video.canPlayType("application/vnd.apple.mpegurl")) {
+          if (canUseNativeHls()) {
             video.src = hlsUrl;
             return;
           }
 
-          if (window.Hls && window.Hls.isSupported()) {
+          if (canUseHlsJs()) {
             hlsInstance = new window.Hls({
               enableWorker: true,
               lowLatencyMode: true,
@@ -316,7 +643,7 @@
           }
         }
 
-        if (!hlsUrl) {
+        if (!hlsUrl || (!canUseNativeHls() && !canUseHlsJs())) {
           toggleButton.disabled = true;
           toggleButton.textContent = "TV unavailable";
           return;
@@ -344,7 +671,7 @@
         }
       }
 
-      setInterval(pollMode, 14000);
+      setInterval(pollMode, 7000);
     </script>
   </body>
 </html>
