@@ -200,6 +200,14 @@ help        show this help and exit""",
         alphabet = string.ascii_letters + string.digits + "!@#$%^&*()-_=+"
         return "".join(secrets.choice(alphabet) for _ in range(length))
 
+    def _ensure_runtime_moderator_credentials(self) -> Tuple[str, str]:
+        self._ensure_django()
+        from core import user_manager  # pylint: disable=import-outside-toplevel
+    
+        username, password = user_manager.ensure_builtin_moderator()
+        self._close_django_db_connections()
+        return username, password
+
     def _ensure_runtime_admin_credentials(self) -> Tuple[str, str]:
         self._ensure_django()
         from django.contrib.auth import get_user_model  # pylint: disable=import-outside-toplevel
@@ -312,10 +320,16 @@ help        show this help and exit""",
             print(message, flush=True)
             self._draw_status_line()
 
-    def _print_admin_login(self, username: str, password: str) -> None:
+    def _print_login_block(
+        self,
+        label: str,
+        link: str,
+        username: str,
+        password: str,
+    ) -> None:
         print("\n" + "=" * 78)
-        print(" FURATIC ADMIN LOGIN")
-        print(" Link:     http://127.0.0.1:8080/admin/")
+        print(f" FURATIC {label} LOGIN")
+        print(f" Link:     {link}")
         print(f" Username: {username}")
         print(f" Password: {password}")
         print("=" * 78 + "\n")
@@ -431,7 +445,12 @@ help        show this help and exit""",
 
             if os.name == "nt":
                 self.console_lock = threading.Lock()
-                self._print_admin_login(admin_username, admin_password)
+                self._print_login_block(
+                    "ADMIN",
+                    "http://127.0.0.1:8080/admin/",
+                    admin_username,
+                    admin_password,
+                )
 
                 server = subprocess.Popen(
                     [sys.executable, "manage.py", "runserver", "127.0.0.1:8080", "--noreload"],
@@ -451,12 +470,12 @@ help        show this help and exit""",
                 time.sleep(0.75)
                 self._handle_windows_controls(server)
             else:
-                print("\n" + "=" * 78)
-                print(" FURATIC ADMIN LOGIN")
-                print(" Link:     http://127.0.0.1:8080/admin/")
-                print(f" Username: {admin_username}")
-                print(f" Password: {admin_password}")
-                print("=" * 78 + "\n")
+                self._print_login_block(
+                    "ADMIN",
+                    "http://127.0.0.1:8080/admin/",
+                    admin_username,
+                    admin_password,
+                )
 
                 subprocess.call(
                     [sys.executable, "manage.py", "runserver", "127.0.0.1:8080"],
