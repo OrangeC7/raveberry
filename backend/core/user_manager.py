@@ -30,6 +30,10 @@ INACTIVITY_PERIOD = 600
 MODERATOR_GROUP_NAME = "moderator"
 QUEUE_SLOT_TTL_SECONDS = 7 * 24 * 60 * 60
 REQUESTER_IP_TTL_SECONDS = 7 * 24 * 60 * 60
+RECENT_VOTE_WINDOW_SECONDS = 10 * 60
+RECENT_VOTE_TTL_SECONDS = RECENT_VOTE_WINDOW_SECONDS + 60
+MAX_RECENT_DOWNVOTE_TRANSITIONS = 3
+MIN_RECENT_UPVOTE_TRANSITIONS = 2
 
 
 def _normalize_ip(value: str) -> str:
@@ -447,7 +451,77 @@ def get_client_ip_from_scope(scope: Mapping[str, Any]) -> str:
     return _resolve_client_ip_from_meta(meta, remote_addr) or ""
 
 
-def try_vote(request_ip: str, queue_key: int, amount: int) -> bool:
+def _recent_downvote_key(request_ip: str) -> str:
+    return f"recent-downvotes:{request_ip}"
+
+
+def _recent_upvote_key(request_ip: str) -> str:
+    return f"recent-upvotes:{request_ip}"
+
+
+def _trim_recent_vote_activity(request_ip: str, now: float) -> tuple[str, str, float]:
+    down_key = _recent_downvote_key(request_ip)
+    up_key = _recent_upvote_key(request_ip)
+    cutoff = now - RECENT_VOTE_WINDOW_SECONDS
+
+    pipe = redis.connection.pipeline()
+    pipe.zremrangebyscore(down_key, "-inf", cutoff)
+    pipe.zremrangebyscore(up_key, "-inf", cutoff)
+    pipe.expire(down_key, RECENT_VOTE_TTL_SECONDS)
+    pipe.expire(up_key, RECENT_VOTE_TTL_SECONDS)
+    pipe.execute()
+
+    return down_key, up_key, cutoff
+
+
+def _can_add_recent_downvote(
+    request_ip: str, queue_key: int, previous_vote: int, now: float
+) -> bool:
+    down_key, up_key, cutoff = _trim_recent_vote_activity(request_ip, now)
+    recent_downvotes = redis.connection.zcount(down_key, cutoff, "+inf")
+    recent_upvotes = redis.connection.zcount(up_key, cutoff, "+inf")
+
+    # If this vote flips a recent upvote on the same song into a downvote,
+    # that song should no longer count as balancing upvote activity.
+    if previous_vote > 0 and redis.connection.zscore(up_key, str(queue_key)) is not None:
+        recent_upvotes -= 1
+
+    return (
+        recent_downvotes < MAX_RECENT_DOWNVOTE_TRANSITIONS
+        or recent_upvotes >= MIN_RECENT_UPVOTE_TRANSITIONS
+    )
+
+
+def _sync_recent_vote_activity(
+    request_ip: str, queue_key: int, new_vote: int, now: float, record_activity: bool
+) -> None:
+    if not record_activity:
+        return
+
+    down_key, up_key, cutoff = _trim_recent_vote_activity(request_ip, now)
+    member = str(queue_key)
+    pipe = redis.connection.pipeline()
+
+    if new_vote < 0:
+        pipe.zadd(down_key, {member: now})
+        pipe.zrem(up_key, member)
+    elif new_vote > 0:
+        pipe.zadd(up_key, {member: now})
+        pipe.zrem(down_key, member)
+    else:
+        pipe.zrem(down_key, member)
+        pipe.zrem(up_key, member)
+
+    pipe.zremrangebyscore(down_key, "-inf", cutoff)
+    pipe.zremrangebyscore(up_key, "-inf", cutoff)
+    pipe.expire(down_key, RECENT_VOTE_TTL_SECONDS)
+    pipe.expire(up_key, RECENT_VOTE_TTL_SECONDS)
+    pipe.execute()
+
+
+def try_vote(
+    request_ip: str, queue_key: int, amount: int, record_activity: bool = True
+) -> bool:
     """If the user can not vote any more for the song into the given direction, return False.
     Otherwise, perform the vote and returns True."""
     normalized = _normalize_ip(request_ip)
@@ -468,10 +542,12 @@ def try_vote(request_ip: str, queue_key: int, amount: int) -> bool:
     allowed = True
     cooldown_seconds = float(storage.get("vote_change_cooldown_seconds"))
     now = time.time()
+    previous_vote = 0
+    new_vote = 0
 
     # redis transaction: https://github.com/Redis/redis-py#pipelines
     def check_entry(pipe) -> None:
-        nonlocal allowed
+        nonlocal allowed, previous_vote, new_vote
         vote = pipe.get(entry)
         last_change = pipe.get(timestamp_key)
 
@@ -483,13 +559,23 @@ def try_vote(request_ip: str, queue_key: int, amount: int) -> bool:
             allowed = False
             return
 
-        if vote is None:
-            new_vote = amount
-        else:
-            new_vote = int(vote) + amount
+        previous_vote = 0 if vote is None else int(vote)
+        new_vote = previous_vote + amount
+
         if new_vote < -1 or new_vote > 1:
             allowed = False
             return
+
+        # Only limit transitions into a real downvote. Upvotes and clearing votes stay untouched.
+        if (
+            record_activity
+            and previous_vote >= 0
+            and new_vote < 0
+            and not _can_add_recent_downvote(normalized, queue_key, previous_vote, now)
+        ):
+            allowed = False
+            return
+
         allowed = True
         # expire these entries to avoid accumulation over long runtimes.
         pipe.multi()
@@ -497,6 +583,12 @@ def try_vote(request_ip: str, queue_key: int, amount: int) -> bool:
         pipe.set(timestamp_key, now, ex=24 * 60 * 60)
 
     redis.connection.transaction(check_entry, entry, timestamp_key)
+
+    if allowed:
+        _sync_recent_vote_activity(
+            normalized, queue_key, new_vote, now, record_activity
+        )
+
     return allowed
 
 
