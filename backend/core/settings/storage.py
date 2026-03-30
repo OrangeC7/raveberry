@@ -37,7 +37,7 @@ defaults = {
     # basic settings
     "interactivity": Interactivity.full_voting,
     "ip_checking": True,
-    "vote_change_cooldown_seconds": 3.0,
+    "vote_change_cooldown_seconds": 1.0,
     "banned_ips": "",
     "color_indication": Privileges.nobody,
     "color_offset": 0.0,
