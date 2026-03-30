@@ -227,12 +227,27 @@
         color-scheme: dark;
       }
 
+      .icon-button {
+        min-width: 54px;
+        width: 54px;
+        padding: 0;
+      }
+
+      .icon-button img {
+        display: block;
+        width: 22px;
+        height: 22px;
+        filter: brightness(0) invert(1);
+      }
+
       .tv-button {
-        position: absolute;
-        right: 18px;
-        bottom: 18px;
-        z-index: 3;
         background: rgba(8, 12, 24, 0.58);
+      }
+
+      .icon-button:disabled {
+        opacity: 0.55;
+        pointer-events: none;
+        cursor: default;
       }
 
       .tv-panel {
@@ -318,21 +333,64 @@
           <img src="{{ furatic_logo_wide_url }}" alt="FURATIC" decoding="async">
           <div class="notify-row">
             <a
-              class="notify-button{% if not discord_invite_url %} is-disabled{% endif %}"
+              class="notify-button icon-button{% if not discord_invite_url %} is-disabled{% endif %}"
               href="{% if discord_invite_url %}{{ discord_invite_url }}{% else %}#{% endif %}"
               target="_blank"
               rel="noopener noreferrer"
+              aria-label="Discord invite"
+              title="Discord invite"
             >
-              Discord invite
+              <img
+                src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/discord.svg"
+                alt=""
+                aria-hidden="true"
+                decoding="async"
+              >
             </a>
             <a
-              class="notify-button{% if not vrchat_group_url %} is-disabled{% endif %}"
+              class="notify-button icon-button{% if not vrchat_group_url %} is-disabled{% endif %}"
               href="{% if vrchat_group_url %}{{ vrchat_group_url }}{% else %}#{% endif %}"
               target="_blank"
               rel="noopener noreferrer"
+              aria-label="VRChat group"
+              title="VRChat group"
             >
-              VRChat group
+              <img
+                src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/vrchat.svg"
+                alt=""
+                aria-hidden="true"
+                decoding="async"
+              >
             </a>
+            <a
+              class="notify-button icon-button"
+              href="https://bsky.app/profile/furatic.xyz"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Bluesky"
+              title="Bluesky"
+            >
+              <img
+                src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/bluesky.svg"
+                alt=""
+                aria-hidden="true"
+                decoding="async"
+              >
+            </a>
+            <button
+              class="tv-button icon-button"
+              id="tv-toggle"
+              type="button"
+              aria-label="Open TV panel"
+              title="Open TV panel"
+            >
+              <img
+                src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/appletv.svg"
+                alt=""
+                aria-hidden="true"
+                decoding="async"
+              >
+            </button>
           </div>
         </div>
 
@@ -344,7 +402,6 @@
               allow="autoplay"
               allowtransparency="true"
             ></iframe>
-            <button class="tv-button" id="tv-toggle" type="button">TV</button>
           </div>
         </div>
 
@@ -656,10 +713,16 @@
           }
         }
 
+        function syncTvToggle(open) {
+          toggleButton.setAttribute("aria-pressed", open ? "true" : "false");
+          toggleButton.setAttribute("aria-label", open ? "Hide TV panel" : "Open TV panel");
+          toggleButton.setAttribute("title", open ? "Hide TV panel" : "Open TV panel");
+        }
+
         function setOpen(open) {
           panel.classList.toggle("is-open", open);
           panel.setAttribute("aria-hidden", open ? "false" : "true");
-          toggleButton.textContent = open ? "TV · hide" : "TV";
+          syncTvToggle(open);
           if (open) {
             ensureStream();
           } else {
@@ -669,9 +732,12 @@
 
         if (!hlsUrl || (!canUseNativeHls() && !canUseHlsJs())) {
           toggleButton.disabled = true;
-          toggleButton.textContent = "TV unavailable";
+          toggleButton.setAttribute("aria-label", "TV unavailable");
+          toggleButton.setAttribute("title", "TV unavailable");
           return;
         }
+
+        syncTvToggle(false);
 
         toggleButton.addEventListener("click", function () {
           setOpen(!panel.classList.contains("is-open"));
