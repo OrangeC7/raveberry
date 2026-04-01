@@ -11,12 +11,12 @@ from django.conf import settings as conf
 from django.core.handlers.wsgi import WSGIRequest
 from django.db import transaction
 from django.db.models import F
-from django.http import HttpResponseForbidden
+from django.http import HttpResponseForbidden, JsonResponse
 from django.http.response import HttpResponse, HttpResponseBadRequest
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
-from core import models, redis, user_manager
+from core import audit_log, models, redis, user_manager
 from core.musiq import musiq, playback, player
 from core.settings import storage
 from core.util import extract_value
@@ -253,6 +253,63 @@ def remove(request: WSGIRequest) -> HttpResponse:
         return HttpResponseBadRequest("song does not exist")
     return HttpResponse()
 
+@user_manager.tracked
+def remove_own_song(request: WSGIRequest) -> HttpResponse:
+    """Allow a requester to remove only their own queued song, with rate limiting."""
+    key_param = request.POST.get("key")
+    if key_param is None:
+        return HttpResponseBadRequest("missing key")
+
+    key = int(key_param)
+    request_ip = user_manager.get_client_ip(request)
+
+    if not user_manager.song_belongs_to_ip(request_ip, key):
+        return HttpResponseForbidden("That is not your song.")
+
+    if not user_manager.can_self_remove_song(request_ip):
+        return HttpResponseBadRequest(
+            "You have removed too many songs recently. Please wait a few minutes."
+        )
+
+    try:
+        removed = playback.queue.remove(key)
+    except models.QueuedSong.DoesNotExist:
+        return HttpResponseBadRequest("song does not exist")
+
+    user_manager.record_self_remove(request_ip, key)
+
+    audit_log.append(
+        "user_remove_own_song",
+        request=request,
+        target="queue",
+        song_key=key,
+        song_title=removed.displayname(),
+    )
+
+    if not removed.manually_requested:
+        playback.handle_autoplay(removed.external_url or removed.title)
+    else:
+        playback.handle_autoplay()
+
+    musiq.update_state()
+    return HttpResponse("ok")
+
+
+def own_song_state(request: WSGIRequest) -> HttpResponse:
+    """Return the current requester's queued songs and their visible queue positions."""
+    request_ip = user_manager.get_client_ip(request)
+    songs = []
+
+    for position, song in enumerate(musiq.ordered_queue_queryset(), start=1):
+        if user_manager.song_belongs_to_ip(request_ip, song.id):
+            songs.append(
+                {
+                    "queueKey": song.id,
+                    "queuePosition": position,
+                }
+            )
+
+    return JsonResponse({"songs": songs})
 
 @control
 def reorder(request: WSGIRequest) -> HttpResponse:
