@@ -52,6 +52,7 @@ def _state_payload() -> Dict[str, Any]:
         "currentSong": current_payload,
         "queue": queue_payload,
         "bannedIps": user_manager.get_banned_ips(),
+        "auditLog": audit_log.get_recent(120),
     }
 
 
@@ -88,6 +89,13 @@ def remove_song(request: WSGIRequest) -> HttpResponse:
         return HttpResponseBadRequest("Missing queue key")
     try:
         removed = playback.queue.remove(int(key))
+        audit_log.append(
+            "moderator_remove_song",
+            request=request,
+            target="queue",
+            song_key=int(key),
+            song_title=removed.displayname(),
+        )
         if not removed.manually_requested:
             playback.handle_autoplay(removed.external_url or removed.title)
         else:
@@ -102,6 +110,7 @@ def remove_song(request: WSGIRequest) -> HttpResponse:
 def skip_current_song(_request: WSGIRequest) -> HttpResponse:
     """Skip the currently playing song."""
     musiq_controller._skip()
+    audit_log.append("moderator_skip_current", request=_request, target="current-song")
     musiq.update_state()
     return JsonResponse(_state_payload())
 
@@ -123,6 +132,12 @@ def ban_ip(request: WSGIRequest) -> HttpResponse:
 
     try:
         normalized = user_manager.ban_ip(ip)
+        audit_log.append(
+            "moderator_ban_ip",
+            request=request,
+            target=normalized,
+            metadata={"queueKey": queue_key or ""},
+        )
     except ValueError as exc:
         return HttpResponseBadRequest(str(exc))
 
@@ -139,6 +154,7 @@ def unban_ip(request: WSGIRequest) -> HttpResponse:
 
     try:
         normalized = user_manager.unban_ip(ip)
+        audit_log.append("moderator_unban_ip", request=request, target=normalized)
     except ValueError as exc:
         return HttpResponseBadRequest(str(exc))
 
@@ -154,6 +170,7 @@ def set_site_mode(request: WSGIRequest) -> HttpResponse:
         return HttpResponseBadRequest("Invalid site mode")
 
     selected_mode = site_mode.set_mode(mode)
+    audit_log.append("moderator_set_site_mode", request=request, target=selected_mode)
     if selected_mode == site_mode.AFTER_HOURS_MODE:
         playback.request_operator_command("pause_for_afterhours")
     else:
