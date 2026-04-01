@@ -345,6 +345,33 @@
         border: 0;
       }
 
+      .audit-item {
+        display: grid;
+        gap: 8px;
+        padding: 14px 16px;
+        border-radius: 18px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.04);
+      }
+      
+      .audit-topline,
+      .audit-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      
+      .audit-summary {
+        color: var(--text);
+        line-height: 1.45;
+      }
+      
+      .audit-meta {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      
       @media (max-width: 980px) {
         .hero {
           grid-template-columns: 1fr;
@@ -417,7 +444,7 @@
                 <div class="song-title">Nothing is currently playing.</div>
               </div>
             </section>
-
+        
             <section class="panel section">
               <div class="section-head">
                 <h2>Queue</h2>
@@ -427,14 +454,24 @@
                 <div class="empty-state">The queue is currently empty.</div>
               </div>
             </section>
+        
+            <section class="panel section">
+              <div class="section-head">
+                <h2>Audit log</h2>
+                <div class="token"><span id="audit-count">0</span>&nbsp;recent</div>
+              </div>
+              <div id="audit-list" class="stack">
+                <div class="empty-state">No recent actions yet.</div>
+              </div>
+            </section>
           </div>
-
+        
           <section class="panel section">
             <div class="section-head">
               <h2>Banned IPs</h2>
               <div class="token"><span id="banned-count">0</span>&nbsp;active</div>
             </div>
-
+        
             <label class="sr-only" for="manual-ban-input">Ban IP address</label>
             <div class="manual-ban">
               <input
@@ -446,7 +483,7 @@
               >
               <button id="manual-ban-button" class="warn" type="button">Ban IP</button>
             </div>
-
+        
             <div id="ban-list" class="stack">
               <div class="empty-state">No IPs are currently banned.</div>
             </div>
@@ -485,6 +522,72 @@
         }, 3400);
       }
 
+      function formatAuditAction(entry) {
+        const action = entry.action || "action";
+        const songTitle = entry.songTitle ? escapeHtml(entry.songTitle) : "";
+        const amount = entry.metadata && typeof entry.metadata.amount !== "undefined"
+          ? Number(entry.metadata.amount)
+          : null;
+      
+        if (action === "user_add_song") return "Added song" + (songTitle ? ": " + songTitle : "");
+        if (action === "user_remove_own_song") return "Removed own song" + (songTitle ? ": " + songTitle : "");
+        if (action === "user_vote") {
+          if (amount === 1) return "Upvoted song";
+          if (amount === -1) return "Downvoted song";
+          if (amount === 2) return "Strengthened upvote";
+          if (amount === -2) return "Strengthened downvote";
+          return "Voted on song";
+        }
+        if (action === "moderator_remove_song") return "Moderator removed song" + (songTitle ? ": " + songTitle : "");
+        if (action === "moderator_skip_current") return "Moderator skipped current song";
+        if (action === "moderator_ban_ip") return "Moderator banned IP";
+        if (action === "moderator_unban_ip") return "Moderator unbanned IP";
+        if (action === "moderator_set_site_mode") return "Moderator changed site mode";
+        if (action === "page_refresh") return "Refreshed page";
+        return escapeHtml(action);
+      }
+      
+      function formatAuditTime(unixTs) {
+        if (!unixTs) return "—";
+        const date = new Date(unixTs * 1000);
+        return date.toLocaleString();
+      }
+      
+      function renderAuditLog(entries) {
+        const list = document.getElementById("audit-list");
+        const safeEntries = Array.isArray(entries) ? entries : [];
+        document.getElementById("audit-count").textContent = String(safeEntries.length);
+      
+        if (!safeEntries.length) {
+          list.innerHTML = '<div class="empty-state">No recent actions yet.</div>';
+          return;
+        }
+      
+        list.innerHTML = safeEntries.map(function (entry) {
+          const actor = escapeHtml(entry.actor || "unknown");
+          const actorRole = escapeHtml(entry.actorRole || "user");
+          const target = entry.target ? escapeHtml(entry.target) : "";
+          const ip = entry.ip ? escapeHtml(entry.ip) : "—";
+          const summary = formatAuditAction(entry);
+      
+          return [
+            '<article class="audit-item">',
+              '<div class="audit-topline">',
+                '<span class="token">' + actor + '</span>',
+                '<span class="token">' + actorRole + '</span>',
+                target ? '<span class="token">Target: ' + target + '</span>' : '',
+              '</div>',
+              '<div class="audit-summary">' + summary + '</div>',
+              '<div class="audit-meta">',
+                '<span>IP: ' + ip + '</span>',
+                '<span>•</span>',
+                '<span>' + formatAuditTime(entry.ts) + '</span>',
+              '</div>',
+            '</article>'
+          ].join("");
+        }).join("");
+      }
+      
       async function postForm(url, data) {
         const body = new URLSearchParams(data);
         const response = await fetch(url, {
@@ -602,6 +705,7 @@
         renderCurrentSong(data.currentSong || null);
         renderQueue(Array.isArray(data.queue) ? data.queue : []);
         renderBanList(Array.isArray(data.bannedIps) ? data.bannedIps : []);
+        renderAuditLog(Array.isArray(data.auditLog) ? data.auditLog : []);
       }
 
       let refreshInFlight = false;
