@@ -6,7 +6,7 @@ from django.http import HttpResponse, HttpResponseBadRequest
 from django.views.decorators.csrf import csrf_exempt
 
 from django.conf import settings as conf
-from core import site_mode, user_manager
+from core import audit_log, site_mode, user_manager
 from core.musiq import musiq, playback
 from core.musiq.music_provider import ProviderError
 from core.settings import storage
@@ -62,6 +62,13 @@ def post_song(request: WSGIRequest) -> HttpResponse:
             user_manager.register_song(request, queue_key)
             user_manager.register_vote(request, queue_key, 1)
 
+        audit_log.append(
+            "user_add_song",
+            request=request,
+            target="queue",
+            song_key=queue_key,
+            song_title=queued_song.displayname(),
+        )
         musiq.update_state()
 
     return HttpResponse(provider.ok_message)
