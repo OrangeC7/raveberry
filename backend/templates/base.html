@@ -54,6 +54,124 @@
 				<span id="goto-update">show me</span> <span id="remind-updates">remind me later</span> <span id="ignore-updates">don't ask again</span>
 			</div>
 		</div>
+		<script>
+		  $(function() {
+		    const navigationEntries =
+		      typeof performance.getEntriesByType === 'function'
+		        ? performance.getEntriesByType('navigation')
+		        : [];
+		    const navigationType =
+		      navigationEntries.length > 0
+		        ? navigationEntries[0].type
+		        : (performance.navigation && performance.navigation.type === 1 ? 'reload' : 'navigate');
+		
+		    if (navigationType === 'reload' && urls['log-refresh']) {
+		      $.post(urls['log-refresh'], {page: window.location.pathname});
+		    }
+		
+		    if (!urls['musiq'] || !urls['musiq']['own-song-state'] || !urls['musiq']['remove-own-song']) {
+		      return;
+		    }
+		    if (!document.getElementById('song-queue')) {
+		      return;
+		    }
+		
+		    let ownSongs = [];
+		    let ownSongDecorateTimer = null;
+		
+		    function showOwnSongToast(kind, message) {
+		      const toast = $('#' + kind + '-toast');
+		      $('.toast').stop(true, true).hide();
+		      toast.find('.toast-content').text(message);
+		      toast.stop(true, true).fadeIn();
+		      window.setTimeout(function() {
+		        toast.fadeOut();
+		      }, 2400);
+		    }
+		
+		    function clearOwnSongDecorations() {
+		      $('#song-queue > li')
+		        .removeClass('own-song-queue-entry')
+		        .find('.own-song-remove')
+		        .remove();
+		    }
+		
+		    function applyOwnSongDecorations() {
+		      clearOwnSongDecorations();
+		      if (!ownSongs.length) {
+		        return;
+		      }
+		
+		      ownSongs.forEach(function(song) {
+		        const position = Number(song.queuePosition);
+		        const queueKey = Number(song.queueKey);
+		        if (!position || !queueKey) {
+		          return;
+		        }
+		
+		        const item = $('#song-queue > li').eq(position - 1);
+		        if (!item.length) {
+		          return;
+		        }
+		
+		        item.addClass('own-song-queue-entry');
+		
+		        if (!item.children('.own-song-remove').length) {
+		          $('<button/>')
+		            .attr('type', 'button')
+		            .attr('aria-label', 'Remove your song from the queue')
+		            .attr('title', 'Remove your song')
+		            .addClass('own-song-remove')
+		            .data('key', queueKey)
+		            .text('×')
+		            .appendTo(item);
+		        }
+		      });
+		    }
+		
+		    function refreshOwnSongState() {
+		      $.get(urls['musiq']['own-song-state'])
+		        .done(function(response) {
+		          ownSongs = Array.isArray(response.songs) ? response.songs : [];
+		          applyOwnSongDecorations();
+		        });
+		    }
+		
+		    $(document).on('click tap', '.own-song-remove', function(event) {
+		      event.preventDefault();
+		      event.stopPropagation();
+		
+		      const button = $(this);
+		      const key = button.data('key');
+		      if (!key) {
+		        return;
+		      }
+		
+		      button.prop('disabled', true);
+		
+		      $.post(urls['musiq']['remove-own-song'], {key: key})
+		        .done(function() {
+		          refreshOwnSongState();
+		        })
+		        .fail(function(response) {
+		          showOwnSongToast('error', response.responseText || 'Unable to remove your song.');
+		        })
+		        .always(function() {
+		          button.prop('disabled', false);
+		        });
+		    });
+		
+		    const songQueueNode = document.getElementById('song-queue');
+		    const observer = new MutationObserver(function() {
+		      window.clearTimeout(ownSongDecorateTimer);
+		      ownSongDecorateTimer = window.setTimeout(applyOwnSongDecorations, 40);
+		    });
+		    observer.observe(songQueueNode, {childList: true, subtree: true});
+		
+		    refreshOwnSongState();
+		    window.setInterval(refreshOwnSongState, 4000);
+		  });
+		</script>
 		{% if demo %}
 		<div id="demo-banner" class="information-banner" style="display: block;">
 			<i class="fas fa-info-circle"></i>
