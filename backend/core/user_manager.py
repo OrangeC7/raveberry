@@ -35,6 +35,10 @@ RECENT_VOTE_TTL_SECONDS = RECENT_VOTE_WINDOW_SECONDS + 60
 MAX_RECENT_DOWNVOTE_TRANSITIONS = 2
 MIN_RECENT_UPVOTE_TRANSITIONS = 4
 
+SELF_REMOVE_WINDOW_SECONDS = 10 * 60
+SELF_REMOVE_TTL_SECONDS = SELF_REMOVE_WINDOW_SECONDS + 60
+MAX_SELF_REMOVE_ACTIONS = 3
+
 
 def _normalize_ip(value: str) -> str:
     """Normalize an IPv4/IPv6 address and drop any port / wrapper syntax."""
@@ -309,6 +313,52 @@ def get_song_requester_ip(queue_key: int) -> str:
     """Return the requester IP stored for the given queue / current-song key."""
     return redis.connection.get(_requester_ip_key(queue_key)) or ""
 
+def song_belongs_to_ip(request_ip: str, queue_key: int) -> bool:
+    """Return whether the given queue entry belongs to the given requester IP."""
+    normalized = _normalize_ip(request_ip)
+    if not normalized:
+        return False
+    return get_song_requester_ip(queue_key) == normalized
+
+
+def _self_remove_key(request_ip: str) -> str:
+    return f"self-removes:{request_ip}"
+
+
+def can_self_remove_song(request_ip: str) -> bool:
+    """Allow only a few self-removals within the configured time window."""
+    normalized = _normalize_ip(request_ip)
+    if not normalized:
+        return False
+
+    now = time.time()
+    cutoff = now - SELF_REMOVE_WINDOW_SECONDS
+    key = _self_remove_key(normalized)
+
+    pipe = redis.connection.pipeline()
+    pipe.zremrangebyscore(key, "-inf", cutoff)
+    pipe.zcount(key, cutoff, "+inf")
+    pipe.expire(key, SELF_REMOVE_TTL_SECONDS)
+    _, count, _ = pipe.execute()
+
+    return int(count) < MAX_SELF_REMOVE_ACTIONS
+
+
+def record_self_remove(request_ip: str, queue_key: int) -> None:
+    normalized = _normalize_ip(request_ip)
+    if not normalized:
+        return
+
+    now = time.time()
+    cutoff = now - SELF_REMOVE_WINDOW_SECONDS
+    key = _self_remove_key(normalized)
+    member = f"{now}:{queue_key}"
+
+    pipe = redis.connection.pipeline()
+    pipe.zadd(key, {member: now})
+    pipe.zremrangebyscore(key, "-inf", cutoff)
+    pipe.expire(key, SELF_REMOVE_TTL_SECONDS)
+    pipe.execute()
 
 def ip_has_active_queue_slot(request_ip: str) -> bool:
     """Return whether the given IP currently owns a queued song slot."""
