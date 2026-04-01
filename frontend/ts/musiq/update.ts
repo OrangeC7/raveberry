@@ -360,15 +360,18 @@ function updateInformation(entry, song) {
     }
   }
 
-  const previousVote = localStorageGet('vote-' + song.id);
-  if (previousVote == '+') {
-    const up = entry.find('.vote-up');
-    up.addClass('pressed');
-  }
-  if (previousVote == '-') {
-    const down = entry.find('.vote-down');
-    down.addClass('pressed');
-  }
+ const up = entry.find('.vote-up');
+ const down = entry.find('.vote-down');
+ 
+ up.removeClass('pressed');
+ down.removeClass('pressed');
+ 
+ const previousVote = localStorageGet('vote-' + song.id);
+ if (previousVote == '+') {
+   up.addClass('pressed');
+ } else if (previousVote == '-') {
+   down.addClass('pressed');
+ }
 }
 
 /** Apply the given state without any animation from scratch.
