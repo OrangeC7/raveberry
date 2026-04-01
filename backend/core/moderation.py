@@ -9,7 +9,7 @@ from django.shortcuts import render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 
-from core import base, models, site_mode, user_manager
+from core import audit_log, base, models, site_mode, user_manager
 from core.musiq import controller as musiq_controller, musiq, playback, song_utils
 from core.settings import storage
 
@@ -21,10 +21,7 @@ VOTING_INTERACTIVITIES = {
 
 
 def _queue_queryset():
-    queue = playback.queue.all()
-    if storage.get("interactivity") in VOTING_INTERACTIVITIES:
-        return queue.order_by("-votes", "index")
-    return queue.order_by("index")
+    return musiq.ordered_queue_queryset()
 
 
 def _serialize_song(song) -> Dict[str, Any]:
