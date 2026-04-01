@@ -8,11 +8,12 @@ from django.core.handlers.wsgi import WSGIRequest
 from django.db import transaction
 from django.http import HttpResponseBadRequest, HttpResponseRedirect
 from django.http.response import HttpResponse, JsonResponse
+from django.views.decorators.http import require_POST
 from django.shortcuts import render
 from django.urls import reverse
 
 from django.conf import settings as conf
-from core import models, redis, site_mode, user_manager
+from core import audit_log, models, redis, site_mode, user_manager
 from core.lights import controller
 from core.musiq import musiq
 from core.settings import storage
@@ -138,6 +139,13 @@ def afterhours(_request: WSGIRequest) -> HttpResponse:
 def site_mode_status(_request: WSGIRequest) -> HttpResponse:
     """Returns the current runtime-only public site mode."""
     return JsonResponse({"mode": site_mode.get_mode()})
+
+@require_POST
+def log_refresh(request: WSGIRequest) -> HttpResponse:
+    """Record an actual browser reload for moderator audit visibility."""
+    page = request.POST.get("page") or request.path
+    audit_log.append("page_refresh", request=request, target=page)
+    return HttpResponse("ok")
 
 def settings_disabled(_request: WSGIRequest) -> HttpResponse:
     """Disable the broken settings page and send admins to Django admin instead."""
