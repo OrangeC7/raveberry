@@ -45,7 +45,7 @@ def ordered_queue_queryset():
         return all_songs.annotate(
             effective_votes=Case(
                 When(votes__gte=1, then=F("votes")),
-                default=Value(0),
+                default=Value(1),
                 output_field=IntegerField(),
             )
         ).order_by("-effective_votes", "index")
