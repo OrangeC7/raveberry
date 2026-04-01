@@ -55,7 +55,7 @@ class ClientIpBanMiddleware:
             ):
                 response = self.get_response(request)
             else:
-                response = HttpResponse("This IP address is banned.", status=403)
+                response = HttpResponse("This IP address is banned. If you believe this is in error, please contact us on Discord. https://discord.gg/Sr4pAFa8E5", status=403)
         else:
             response = self.get_response(request)
 
