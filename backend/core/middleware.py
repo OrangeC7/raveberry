@@ -1,9 +1,9 @@
-"""Runtime-only FURATIC middleware for bans and After Hours gating."""
+"""Runtime-only FURATIC middleware for bans, IP screening, and After Hours gating."""
 from django.http import HttpResponse
 from django.shortcuts import redirect
 import logging
 
-from core import site_mode, user_manager
+from core import audit_log, ip_screening, site_mode, user_manager
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +37,24 @@ _ALLOWED_PREFIXES = (
 )
 
 
+def _can_bypass_ban(path, request) -> bool:
+    if path.startswith(_BAN_ALWAYS_ALLOWED_PREFIXES):
+        return True
+    if path.startswith(_MODERATOR_RECOVERY_PREFIXES) and user_manager.can_moderate(
+        getattr(request, "user", None)
+    ):
+        return True
+    return False
+
+
+def _ban_response() -> HttpResponse:
+    return HttpResponse(
+        'This IP address is banned. If you believe this is in error, please contact us on Discord: '
+        '<a href="https://discord.gg/Sr4pAFa8E5" target="_blank" rel="noopener noreferrer">Join our Discord</a>',
+        status=403,
+    )
+
+
 class ClientIpBanMiddleware:
     """Resolve the real client IP, log requests, and block banned traffic."""
 
@@ -46,20 +64,37 @@ class ClientIpBanMiddleware:
     def __call__(self, request):
         request.client_ip = user_manager.get_client_ip(request)
         path = request.path
+        screening = None
 
         if request.client_ip and user_manager.is_banned_ip(request.client_ip):
-            if path.startswith(_BAN_ALWAYS_ALLOWED_PREFIXES):
-                response = self.get_response(request)
-            elif path.startswith(_MODERATOR_RECOVERY_PREFIXES) and user_manager.can_moderate(
-                getattr(request, "user", None)
-            ):
+            screening = {
+                "blocked": True,
+                "reason": "manual-ban",
+                "cached": True,
+                "newlyBlocked": False,
+            }
+        elif request.client_ip:
+            screening = ip_screening.evaluate_ip(
+                request.client_ip,
+                allow_api=not site_mode.is_afterhours(),
+            )
+            if screening.get("blocked") and screening.get("newlyBlocked"):
+                audit_log.append(
+                    "ip_screen_block",
+                    request=request,
+                    target=request.client_ip,
+                    metadata={
+                        "reason": screening.get("reason", ""),
+                        "source": screening.get("source", {}),
+                        "api": screening.get("api", {}),
+                    },
+                )
+
+        if screening and screening.get("blocked"):
+            if _can_bypass_ban(path, request):
                 response = self.get_response(request)
             else:
-                response = HttpResponse(
-                    'This IP address is banned. If you believe this is in error, please contact us on Discord: '
-                    '<a href="https://discord.gg/Sr4pAFa8E5" target="_blank" rel="noopener noreferrer">Join our Discord</a>',
-                    status=403,
-                )
+                response = _ban_response()
         else:
             response = self.get_response(request)
 
