@@ -1240,12 +1240,12 @@
       document.addEventListener("click", async function (event) {
         const button = event.target.closest("button[data-action]");
         if (!button) return;
-
+      
         try {
           if (button.disabled) return;
           button.disabled = true;
           const action = button.getAttribute("data-action");
-
+      
           if (action === "remove-song") {
             await removeSong(button.getAttribute("data-key"));
           } else if (action === "skip-current") {
@@ -1260,7 +1260,6 @@
             await unbanIp(button.getAttribute("data-ip"));
           } else if (action === "unban-ip") {
             await unbanIp(button.getAttribute("data-ip"));
-          }
           } else if (action === "rename-blocklist") {
             await renameBlocklist(
               button.getAttribute("data-id"),
@@ -1271,6 +1270,7 @@
               button.getAttribute("data-id"),
               button.getAttribute("data-name")
             );
+          }
         } catch (error) {
           showToast(error.message || "Action failed.", "warn");
         } finally {
