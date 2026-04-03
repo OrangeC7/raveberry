@@ -656,6 +656,7 @@ def evaluate_ip(ip: str, *, allow_api: bool) -> Dict[str, Any]:
         }
 
     if not conf.FURATIC_IP_INTEL_CONTACT_EMAIL:
+        logger.warning("ip_screening skip ip=%s reason=missing-contact-email", normalized)
         return {
             "blocked": False,
             "reason": "missing-contact-email",
@@ -674,6 +675,7 @@ def evaluate_ip(ip: str, *, allow_api: bool) -> Dict[str, Any]:
         }
 
     if not _reserve_api_budget():
+        logger.warning("ip_screening skip ip=%s reason=api-budget-exhausted", normalized)
         _set_deferred(normalized, "budget-exhausted")
         return {
             "blocked": False,
@@ -755,5 +757,15 @@ def evaluate_ip(ip: str, *, allow_api: bool) -> Dict[str, Any]:
         normalized,
         decision,
         int(conf.FURATIC_IP_SCREEN_CACHE_TTL_SECONDS),
+    )
+
+    logger.info(
+        "ip_screening result ip=%s blocked=%s result=%s vpnType=%s iCloudRelay=%s GoogleOneVPN=%s",
+        normalized,
+        blocked,
+        result_raw,
+        vpn_type,
+        i_cloud_relay,
+        google_one_vpn,
     )
     return decision
