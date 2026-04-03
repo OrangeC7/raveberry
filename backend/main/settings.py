@@ -280,12 +280,11 @@ FURATIC_OBS_OUTPUT_DIR = os.path.expanduser(
 )
 
 FURATIC_IP_BLOCKLIST_DIR = os.path.join(BASE_DIR, "config/ip_blocklists")
-
 FURATIC_IP_SCREEN_CACHE_TTL_SECONDS = 86400
 FURATIC_IP_INTEL_ENABLED = True
 FURATIC_IP_INTEL_CONTACT_EMAIL = "contact@mglabs.dev"
 FURATIC_IP_INTEL_FLAGS = "m"
-FURATIC_IP_INTEL_BLOCK_THRESHOLD = 1.0
+FURATIC_IP_INTEL_BLOCK_THRESHOLD = 1
 FURATIC_IP_INTEL_DAILY_LIMIT = 500
 FURATIC_IP_INTEL_MINUTE_LIMIT = 15
 FURATIC_IP_INTEL_TIMEOUT_SECONDS = 3
@@ -312,12 +311,6 @@ FURATIC_IP_INTEL_ENABLED = strtobool(
             "1",
         )
     )
-)
-
-FURATIC_IP_INTEL_CONTACT_EMAIL = (
-    os.environ.get("FURATIC_IP_INTEL_CONTACT_EMAIL", "").strip()
-    or os.environ.get("GETIPINTEL_CONTACT_EMAIL", "").strip()
-    or str(config.get("furatic_ip_intel_contact_email", "") or "").strip()
 )
 
 FURATIC_IP_INTEL_FLAGS = (
