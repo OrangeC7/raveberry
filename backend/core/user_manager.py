@@ -289,6 +289,47 @@ def unban_ip(ip: str) -> str:
     return normalized
 
 
+def _whitelisted_ips_storage_key() -> str:
+    return str(storage.get("whitelisted_ips"))
+
+
+def get_whitelisted_ips() -> list[str]:
+    """Return the persisted whitelist of trusted IPs."""
+    raw_value = _whitelisted_ips_storage_key()
+    return _normalize_ip_collection(re.split(r"[\s,]+", raw_value))
+
+
+def _store_whitelisted_ips(ips: Iterable[str]) -> None:
+    storage.put("whitelisted_ips", "\n".join(_normalize_ip_collection(ips)))
+
+
+def is_whitelisted_ip(ip: str) -> bool:
+    normalized = _normalize_ip(ip)
+    return bool(normalized and normalized in set(get_whitelisted_ips()))
+
+
+def whitelist_ip(ip: str) -> str:
+    """Persistently whitelist the given IP and return the normalized value."""
+    normalized = _normalize_ip(ip)
+    if not normalized:
+        raise ValueError("Invalid IP address")
+    whitelisted_ips = set(get_whitelisted_ips())
+    whitelisted_ips.add(normalized)
+    _store_whitelisted_ips(whitelisted_ips)
+    return normalized
+
+
+def unwhitelist_ip(ip: str) -> str:
+    """Remove the given IP from the persistent whitelist."""
+    normalized = _normalize_ip(ip)
+    if not normalized:
+        raise ValueError("Invalid IP address")
+    whitelisted_ips = set(get_whitelisted_ips())
+    whitelisted_ips.discard(normalized)
+    _store_whitelisted_ips(whitelisted_ips)
+    return normalized
+
+
 def _queue_slot_key(request_ip: str) -> str:
     return f"queue-slot:{request_ip}"
 
