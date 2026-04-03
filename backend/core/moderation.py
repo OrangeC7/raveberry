@@ -52,6 +52,7 @@ def _state_payload() -> Dict[str, Any]:
         "currentSong": current_payload,
         "queue": queue_payload,
         "bannedIps": user_manager.get_banned_ips(),
+        "whitelistedIps": user_manager.get_whitelisted_ips(),
         "auditLog": audit_log.get_recent(120),
         "blocklists": ip_screening.list_blocklists(),
         "ipIntel": ip_screening.get_runtime_state(),
@@ -69,6 +70,8 @@ def dashboard(request: WSGIRequest) -> HttpResponse:
             "moderator_skip_current_url": reverse("moderator-skip-current"),
             "moderator_ban_ip_url": reverse("moderator-ban-ip"),
             "moderator_unban_ip_url": reverse("moderator-unban-ip"),
+            "moderator_whitelist_ip_url": reverse("moderator-whitelist-ip"),
+            "moderator_unwhitelist_ip_url": reverse("moderator-unwhitelist-ip"),
             "moderator_site_mode_url": reverse("moderator-site-mode"),
             "moderator_add_blocklist_url": reverse("moderator-add-blocklist"),
             "moderator_rename_blocklist_url": reverse("moderator-rename-blocklist"),
@@ -165,6 +168,38 @@ def unban_ip(request: WSGIRequest) -> HttpResponse:
 
     return JsonResponse({"ip": normalized, "bannedIps": user_manager.get_banned_ips()})
 
+@require_POST
+@user_manager.moderator_required
+def whitelist_ip(request: WSGIRequest) -> HttpResponse:
+    """Whitelist a trusted requester IP."""
+    ip = request.POST.get("ip", "")
+    if not ip:
+        return HttpResponseBadRequest("Missing IP address")
+
+    try:
+        normalized = user_manager.whitelist_ip(ip)
+        audit_log.append("moderator_whitelist_ip", request=request, target=normalized)
+    except ValueError as exc:
+        return HttpResponseBadRequest(str(exc))
+
+    return JsonResponse({"ip": normalized, "whitelistedIps": user_manager.get_whitelisted_ips()})
+
+
+@require_POST
+@user_manager.moderator_required
+def unwhitelist_ip(request: WSGIRequest) -> HttpResponse:
+    """Remove a trusted requester IP from the whitelist."""
+    ip = request.POST.get("ip", "")
+    if not ip:
+        return HttpResponseBadRequest("Missing IP address")
+
+    try:
+        normalized = user_manager.unwhitelist_ip(ip)
+        audit_log.append("moderator_unwhitelist_ip", request=request, target=normalized)
+    except ValueError as exc:
+        return HttpResponseBadRequest(str(exc))
+
+    return JsonResponse({"ip": normalized, "whitelistedIps": user_manager.get_whitelisted_ips()})
 
 @require_POST
 @user_manager.moderator_required
