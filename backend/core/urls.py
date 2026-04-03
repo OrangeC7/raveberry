@@ -71,6 +71,21 @@ urlpatterns: List[Union[URLPattern, URLResolver]] = [
                                 moderation.set_site_mode,
                                 name="moderator-site-mode",
                             ),
+                            path(
+                                "blocklists/add/",
+                                moderation.add_blocklist,
+                                name="moderator-add-blocklist",
+                            ),
+                            path(
+                                "blocklists/rename/",
+                                moderation.rename_blocklist,
+                                name="moderator-rename-blocklist",
+                            ),
+                            path(
+                                "blocklists/remove/",
+                                moderation.remove_blocklist,
+                                name="moderator-remove-blocklist",
+                            ),
                         ]
                     ),
                 ),
