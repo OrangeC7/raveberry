@@ -39,6 +39,7 @@ defaults = {
     "ip_checking": True,
     "vote_change_cooldown_seconds": 1.0,
     "banned_ips": "",
+    "whitelisted_ips": "",
     "ip_blocklist_sources": "",
     "ip_blocklist_bootstrap_done": False,
     "color_indication": Privileges.nobody,
