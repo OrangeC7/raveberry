@@ -47,12 +47,21 @@ def _can_bypass_ban(path, request) -> bool:
     return False
 
 
-def _ban_response() -> HttpResponse:
-    return HttpResponse(
-        'This IP address is banned. If you believe this is in error, please contact us on Discord: '
-        '<a href="https://discord.gg/Sr4pAFa8E5" target="_blank" rel="noopener noreferrer">Join our Discord</a>',
-        status=403,
-    )
+def _ban_response(reason: str = "") -> HttpResponse:
+    if reason in {"api", "blocklist"}:
+        message = (
+            'Connections from VPNs, proxies, relays, or datacenter IPs are not allowed here. '
+            'Please disconnect from your VPN or proxy and try again. '
+            'If you believe this is in error, please contact us on Discord: '
+            '<a href="https://discord.gg/Sr4pAFa8E5" target="_blank" rel="noopener noreferrer">Join our Discord</a>'
+        )
+    else:
+        message = (
+            'This IP address is banned. If you believe this is in error, please contact us on Discord: '
+            '<a href="https://discord.gg/Sr4pAFa8E5" target="_blank" rel="noopener noreferrer">Join our Discord</a>'
+        )
+
+    return HttpResponse(message, status=403)
 
 
 class ClientIpBanMiddleware:
@@ -94,7 +103,7 @@ class ClientIpBanMiddleware:
             if _can_bypass_ban(path, request):
                 response = self.get_response(request)
             else:
-                response = _ban_response()
+                response = _ban_response(screening.get("reason", ""))
         else:
             response = self.get_response(request)
 
