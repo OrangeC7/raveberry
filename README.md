@@ -1,4 +1,110 @@
-# Raveberry
+### This is our heavily modified fork of [Raveberry](https://github.com/raveberry/raveberry). 
+### Made to help operate our FURATIC [Pass the Aux](https://vrchat.com/home/group/grp_abb22096-1394-451f-bb13-0e4f9d63b9fb) events.
+### Ravefurry is currently in active development and will have many improvements added over time.
+
+<img src="/UIdemo.gif" alt="New UI" width="420">
+
+Ravefurry keeps core ideas that made Raveberry useful:
+
+- a shared music queue
+- browser based song requests
+- democratic ordering and voting
+- a self hosted system that can be customized and extended
+
+We kept a substantial amount of the original codebase intact, then modified and expanded it with an upgraded UI, better operational control, better reliability, and support for our environment.
+
+## Why this fork exists
+
+Upstream Raveberry was originally built around a Raspberry Pi oriented deployment model and its own default operating assumptions. That was a great base, but it was not the exact thing we needed.
+
+Ravefurry exists because we needed a version that better matched our use case, including:
+
+- Windows friendly deployment and operation
+- stronger moderation tools
+- more control over how the public site behaves during events
+- better handling of abusive or unwanted traffic
+- more reliability around music fetching and queue operations
+- a more customized UI and operator workflow
+
+<img src="/modUIdemo.png" alt="New UI" width="720">
+
+## What changed from upstream
+
+### 1. Platform and deployment changes
+
+Ravefurry has been adapted well beyond the original Raspberry Pi centric setup.
+
+This repository includes custom Windows install/start scripts and a Windows oriented bootstrap flow for dependencies, frontend assets, and local services.
+
+### 2. PostgreSQL backed runtime
+
+We moved this fork toward a PostgreSQL backed runtime because our use case needed stronger behavior under simultaneous activity and a more robust database setup.
+
+### 3. Event mode and after hours mode
+
+Ravefurry adds explicit site mode behavior so the public experience can change depending on whether an event is live or not.
+
+Instead of treating the site as a single always on public mode, this fork supports:
+
+- **Event mode**
+- **After hours mode**
+
+That allows us to control access and behavior in a way that better fits how we actually run it.
+
+### 4. A much stronger moderation system
+
+This fork adds a substantially expanded moderation workflow compared with upstream.
+
+The moderator tooling in Ravefurry is built around active operational control, including things like:
+
+- viewing the current song and queue in a moderator focused dashboard
+- removing queued songs
+- skipping the current song
+- switching site mode
+- seeing recent moderation and user activity
+- managing allowed or disallowed IPs directly
+
+Moderation is one of the areas where this fork has expanded the most.
+
+### 5. IP screening, VPN/datacenter blocking, and blocklists
+
+Ravefurry adds traffic screening features that are not part of stock upstream behavior.
+
+This includes support for:
+
+- blocking known bad or unwanted IPs
+- whitelisting trusted IPs
+- screening traffic for VPN/proxy/datacenter usage
+- maintaining local IPv4 blocklists
+- importing blocklists from either uploaded text files or raw text URLs
+- managing those blocklists from the moderator UI
+
+That gives operators much more control over who can interact with the system and under what conditions.
+
+### 6. YouTube/provider reliability improvements
+
+We also changed parts of the music-fetching pipeline to behave more reliably in our environment.
+
+This includes improvements around:
+
+- yt-dlp request handling
+- retry/timeout behavior
+- safer handling of failed background fetches
+
+### 7. UI and workflow customization
+
+The UI in this fork has been customized significantly from upstream.
+
+That includes both public-facing behavior and operator-facing behavior. The goal was not to throw away the original foundation, but to make the experience better suited to how we actually use the software.
+
+## Status
+
+Ravefurry is an actively customized fork and will continue to evolve over time as we keep improving it for our use case.
+
+
+
+
+## Below is the Raveberry README from before we made our own changes:
 
 [![Build Status](https://img.shields.io/github/actions/workflow/status/raveberry/raveberry/publish.yml)](https://github.com/raveberry/raveberry/actions/workflows/publish.yml)
 [![PyPI](https://img.shields.io/pypi/v/raveberry)](https://pypi.org/project/raveberry/)
