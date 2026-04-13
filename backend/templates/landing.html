@@ -408,6 +408,7 @@
         <div class="player-card">
           <div class="player-stage">
             <iframe
+              id="queue-player-frame"
               src="/p/"
               title="FURATIC queue player"
               allow="autoplay"
@@ -759,19 +760,36 @@
         });
       })();
 
+      let redirectingToAfterHours = false;
+      
       async function pollMode() {
         try {
           const response = await fetch("/api/site-mode/", { cache: "no-store" });
           if (!response.ok) return;
           const data = await response.json();
-          if (data.mode === "afterhours") {
-            window.location.href = "/afterhours/";
+      
+          if (data.mode === "afterhours" && !redirectingToAfterHours) {
+            redirectingToAfterHours = true;
+      
+            const frame = document.getElementById("queue-player-frame");
+            try {
+              frame?.contentWindow?.postMessage(
+                { type: "furatic:shutdown-state-socket" },
+                window.location.origin
+              );
+            } catch (_error) {
+              // ignore
+            }
+      
+            window.setTimeout(function () {
+              window.location.replace("/afterhours/");
+            }, 150);
           }
         } catch (_error) {
           // silent retry
         }
       }
-
+      
       setInterval(pollMode, 7000);
     </script>
   </body>
