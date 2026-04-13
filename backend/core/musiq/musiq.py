@@ -310,7 +310,10 @@ def embed(request: WSGIRequest) -> HttpResponse:
         else:
             suggestion_count = 0
         context[f"{platform}_suggestions"] = suggestion_count
-    return render(request, "musiq_embed.html", context)
+
+    return base._disable_dynamic_page_cache(
+        render(request, "musiq_embed.html", context)
+    )
 
 def _add_color_indication(engagement, song_dict) -> None:
     requested_by = None
