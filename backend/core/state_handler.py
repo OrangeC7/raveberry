@@ -1,5 +1,6 @@
 """This module handles realtime communication via websockets."""
 import json
+import logging
 from typing import Any, Dict
 
 from asgiref.sync import async_to_sync
@@ -7,17 +8,22 @@ from channels.generic.websocket import WebsocketConsumer
 from channels.layers import get_channel_layer
 from django.core.handlers.wsgi import WSGIRequest
 from django.http import JsonResponse
-from core import user_manager
-import logging
+
 from core import user_manager
 
 logger = logging.getLogger(__name__)
+
+STATE_GROUP = "state"
+
 
 def send_state(state: Dict[str, Any]) -> None:
     """Sends the given dictionary as a state update to all connected clients."""
     data = {"type": "state_update", "state": state}
     channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)("state", data)
+    try:
+        async_to_sync(channel_layer.group_send)(STATE_GROUP, data)
+    except Exception:
+        logger.exception("WS STATE BROADCAST FAILED")
 
 
 def get_state(_request: WSGIRequest, module) -> JsonResponse:
@@ -31,6 +37,7 @@ class StateConsumer(WebsocketConsumer):
 
     def connect(self) -> None:
         self.client_ip = user_manager.get_client_ip_from_scope(self.scope)
+        self._joined_state_group = False
 
         if self.client_ip and user_manager.is_banned_ip(self.client_ip):
             logger.info(
@@ -46,8 +53,21 @@ class StateConsumer(WebsocketConsumer):
             self.scope.get("path", ""),
             self.client_ip or "",
         )
-        async_to_sync(self.channel_layer.group_add)("state", self.channel_name)
-        self.accept()
+
+        try:
+            async_to_sync(self.channel_layer.group_add)(STATE_GROUP, self.channel_name)
+            self._joined_state_group = True
+            self.accept()
+        except Exception:
+            logger.exception(
+                "WS CONNECT FAILED %s [ip=%s]",
+                self.scope.get("path", ""),
+                self.client_ip or "",
+            )
+            try:
+                self.close()
+            except Exception:
+                pass
 
     def disconnect(self, code: int) -> None:
         logger.info(
@@ -56,21 +76,39 @@ class StateConsumer(WebsocketConsumer):
             getattr(self, "client_ip", "") or "",
             code,
         )
-        async_to_sync(self.channel_layer.group_discard)("state", self.channel_name)
+
+        if getattr(self, "_joined_state_group", False):
+            try:
+                async_to_sync(self.channel_layer.group_discard)(
+                    STATE_GROUP,
+                    self.channel_name,
+                )
+            except Exception:
+                logger.warning(
+                    "WS GROUP DISCARD FAILED %s [ip=%s code=%s]",
+                    self.scope.get("path", ""),
+                    getattr(self, "client_ip", "") or "",
+                    code,
+                    exc_info=True,
+                )
+            finally:
+                self._joined_state_group = False
 
     def receive(self, text_data: str = None, bytes_data: bytes = None) -> None:
-        pass
+        return
 
-    def state_update(self, event: Dict[str, Any]):
+    def state_update(self, event: Dict[str, Any]) -> None:
         """Receives a message from the room group and sends it back to the websocket."""
-        self.send(text_data=json.dumps(event["state"]))
-
-    def disconnect(self, code: int) -> None:
-        async_to_sync(self.channel_layer.group_discard)("state", self.channel_name)
-
-    def receive(self, text_data: str = None, bytes_data: bytes = None) -> None:
-        pass
-
-    def state_update(self, event: Dict[str, Any]):
-        """Receives a message from the room group and sends it back to the websocket."""
-        self.send(text_data=json.dumps(event["state"]))
+        try:
+            self.send(text_data=json.dumps(event["state"]))
+        except Exception:
+            logger.warning(
+                "WS SEND FAILED %s [ip=%s]",
+                self.scope.get("path", ""),
+                getattr(self, "client_ip", "") or "",
+                exc_info=True,
+            )
+            try:
+                self.close()
+            except Exception:
+                pass
