@@ -38,6 +38,29 @@ def _get_apk_link() -> str:
     return "https://github.com/raveberry/shareberry/releases/latest/download/shareberry.apk"
 
 
+def _static_asset_version() -> str:
+    """Return a cache-busting version for frontend assets."""
+    candidates = [
+        os.path.join(conf.STATIC_FILES, "bundle.js"),
+        os.path.join(conf.STATIC_FILES, "style.css"),
+    ]
+    newest_mtime = 0
+    for path in candidates:
+        try:
+            newest_mtime = max(newest_mtime, int(os.path.getmtime(path)))
+        except OSError:
+            continue
+    return f"{conf.VERSION}-{newest_mtime}"
+
+
+def _disable_dynamic_page_cache(response: HttpResponse) -> HttpResponse:
+    """Prevent browsers from caching dynamic HTML shells."""
+    response["Cache-Control"] = "no-store, no-cache, max-age=0, must-revalidate, private"
+    response["Pragma"] = "no-cache"
+    response["Expires"] = "0"
+    return response
+
+
 def _furatic_public_context() -> Dict[str, Any]:
     """Shared public Furatic branding / link context."""
     return {
@@ -77,10 +100,6 @@ def context(request: WSGIRequest) -> Dict[str, Any]:
         "color_indication": user_manager.has_privilege(
             request.user, storage.get("color_indication")
         ),
-        # We pass the color to the user here for two reasons
-        # 1. a color is assigned to every user on page load, not on first interaction
-        # 2. during state updates every session receives all information,
-        #    thus we would have to send the mapping to everyone, revealing session keys
         "user_color": user_manager.color_of(request.session.session_key),
         "privileges": {
             "everybody": storage.Privileges.everybody,
@@ -96,6 +115,7 @@ def context(request: WSGIRequest) -> Dict[str, Any]:
         "is_moderator": user_manager.is_moderator(request.user),
         "can_moderate": user_manager.can_moderate(request.user),
         "apk_link": _get_apk_link(),
+        "static_asset_version": _static_asset_version(),
         "local_enabled": storage.get("local_enabled"),
         "youtube_enabled": storage.get("youtube_enabled"),
         "spotify_enabled": storage.get("spotify_enabled"),
@@ -128,12 +148,16 @@ def state_dict() -> Dict[str, Any]:
 
 def landing(request: WSGIRequest) -> HttpResponse:
     """Renders the static page with the embedded player iframe."""
-    return render(request, "landing.html", _furatic_public_context())
+    return _disable_dynamic_page_cache(
+        render(request, "landing.html", _furatic_public_context())
+    )
 
 
 def afterhours(_request: WSGIRequest) -> HttpResponse:
     """Renders the FURATIC After Hours page."""
-    return render(_request, "landing_afterhours.html", _furatic_public_context())
+    return _disable_dynamic_page_cache(
+        render(_request, "landing_afterhours.html", _furatic_public_context())
+    )
 
 
 def site_mode_status(_request: WSGIRequest) -> HttpResponse:
@@ -153,7 +177,9 @@ def settings_disabled(_request: WSGIRequest) -> HttpResponse:
 
 def no_stream(request: WSGIRequest) -> HttpResponse:
     """Renders the /stream page. If this is reached, there is no stream active."""
-    return render(request, "no_stream.html", context(request))
+    return _disable_dynamic_page_cache(
+        render(request, "no_stream.html", context(request))
+    )
 
 
 def submit_hashtag(request: WSGIRequest) -> HttpResponse:
