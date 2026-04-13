@@ -708,7 +708,7 @@
           if (!response.ok) return;
           const data = await response.json();
           if (data.mode === "event") {
-            window.location.href = "/";
+            window.location.replace("/");
           }
         } catch (_error) {
           // silent retry
