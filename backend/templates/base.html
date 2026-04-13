@@ -8,7 +8,7 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 		<meta name="referrer" content="strict-origin-when-cross-origin">
 
-		<link rel="stylesheet" href="{% static "style.css" %}"/>
+		<link rel="stylesheet" href="{% static "style.css" %}?v={{ static_asset_version }}"/>
 
 		<script>
 			const CSRF_TOKEN = "{{ csrf_token }}";
@@ -33,7 +33,7 @@
 			{% block js %}
 			{% endblock %}
 		</script>
-		<script src="{% static "bundle.js" %}"></script>
+		<script src="{% static "bundle.js" %}?v={{ static_asset_version }}"></script>
 		<script>
 		  $(function() {
 		    const currentSongTitle = document.getElementById('current-song-title');
