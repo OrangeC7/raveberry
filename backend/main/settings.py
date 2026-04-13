@@ -384,12 +384,24 @@ if not os.path.exists(os.path.join(BASE_DIR, "static/admin")):
 
 # channels
 ASGI_APPLICATION = "main.routing.APPLICATION"
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {"hosts": [(REDIS_HOST, REDIS_PORT)], "capacity": 1500, "expiry": 10},
+
+if "runserver" in sys.argv:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer",
+        }
     }
-}
+else:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [(REDIS_HOST, REDIS_PORT)],
+                "capacity": 1500,
+                "expiry": 10,
+            },
+        }
+    }
 
 # Logging
 
