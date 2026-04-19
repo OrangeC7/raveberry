@@ -1,17 +1,35 @@
 """This module contains the base class of all music providers."""
 
+
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
-from core.musiq import musiq, playback
+from core import models, redis
+from core.musiq import musiq, playback, player
 from core.settings import storage
 from core.tasks import app
 
 
+def _stop_idle_backup_stream_after_failure() -> None:
+    """Do not leave the backup stream running after a failed manual request."""
+    if not redis.get("backup_playing"):
+        return
+    if models.CurrentSong.objects.exists():
+        return
+    if playback.queue.confirmed().exists():
+        return
+
+    try:
+        player.pause()
+    except Exception:  # pylint: disable=broad-except
+        logging.exception("failed to stop backup stream after fetch failure")
+    redis.put("backup_playing", False)
+
+
 class ProviderError(Exception):
     """An error to indicate that an error occurred while providing music."""
-
 
 class WrongUrlError(Exception):
     """An error to indicate that a provider was called
@@ -121,14 +139,13 @@ def enqueue(provider: MusicProvider, session_key: str, archive: bool) -> None:
     provider.enqueue()
 
 
-import logging
-
 @app.task
 def fetch_enqueue(provider: MusicProvider, session_key: str, archive: bool) -> None:
     """Fetch and enqueue the music managed by the given provider."""
     try:
         if not provider.make_available():
             provider.remove_placeholder()
+            _stop_idle_backup_stream_after_failure()
             musiq.update_state()
             return
 
@@ -139,4 +156,5 @@ def fetch_enqueue(provider: MusicProvider, session_key: str, archive: bool) -> N
             provider.remove_placeholder()
         except Exception:
             logging.exception("failed to remove placeholder after fetch_enqueue error")
+        _stop_idle_backup_stream_after_failure()
         musiq.update_state()
