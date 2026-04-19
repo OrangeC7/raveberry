@@ -296,7 +296,7 @@ def remove_own_song(request: WSGIRequest) -> HttpResponse:
 
 
 def own_song_state(request: WSGIRequest) -> HttpResponse:
-    """Return the current requester's queued songs and their visible queue positions."""
+    """Return the current requester's queued songs and current-song ownership."""
     request_ip = user_manager.get_client_ip(request)
     songs = []
 
@@ -309,7 +309,15 @@ def own_song_state(request: WSGIRequest) -> HttpResponse:
                 }
             )
 
-    return JsonResponse({"songs": songs})
+    current_song_queue_key = None
+    current_song = models.CurrentSong.objects.first()
+    if current_song and user_manager.song_belongs_to_ip(request_ip, current_song.queue_key):
+        current_song_queue_key = current_song.queue_key
+
+    return JsonResponse({
+        "songs": songs,
+        "currentSongQueueKey": current_song_queue_key,
+    })
 
 @control
 def reorder(request: WSGIRequest) -> HttpResponse:
