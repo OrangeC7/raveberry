@@ -16,7 +16,7 @@ from django.utils import timezone
 
 from core import models, redis, user_manager
 from core.lights import controller as lights_controller
-from core.musiq import musiq
+from core.musiq import musiq, player
 from core.settings import storage
 from core.tasks import app
 from core.musiq import song_utils
@@ -407,8 +407,16 @@ class Playback:
                 continue
 
             if redis.get("playback_error"):
-                # sleep for a short while so continuing errors don't lead to busy loops
-                time.sleep(0.5)
+                # When the backend comes back after a transient error, probe it and
+                # clear the runtime error flag so skip/next can recover automatically.
+                try:
+                    self.player().should_stop_waiting(True)
+                except PlaybackError:
+                    time.sleep(0.5)
+                    continue
+
+                player.set_playback_error(False)
+                time.sleep(0.1)
                 continue
 
             if redis.get("stop_playback_loop"):
