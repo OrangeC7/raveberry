@@ -1,12 +1,14 @@
 """This module manages and counts user accesses and handles permissions."""
 import colorsys
 import ipaddress
+import json
 import random
 import re
 import secrets
 import time
 from ast import literal_eval
 from functools import wraps
+from pathlib import Path
 from typing import Callable, Iterable, Optional
 
 from django.conf import settings as conf
@@ -38,6 +40,41 @@ MIN_RECENT_UPVOTE_TRANSITIONS = 4
 SELF_REMOVE_WINDOW_SECONDS = 10 * 60
 SELF_REMOVE_TTL_SECONDS = SELF_REMOVE_WINDOW_SECONDS + 60
 MAX_SELF_REMOVE_ACTIONS = 3
+
+BUILTIN_CREDENTIALS_PATH = Path(conf.BASE_DIR) / "config" / "builtin_credentials.json"
+BUILTIN_PASSWORD_BYTES = 20
+
+
+def _load_builtin_credentials() -> dict:
+    try:
+        with BUILTIN_CREDENTIALS_PATH.open("r", encoding="utf-8") as infile:
+            data = json.load(infile)
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return {}
+    if isinstance(data, dict):
+        return data
+    return {}
+
+
+def _save_builtin_credentials(credentials: dict) -> None:
+    BUILTIN_CREDENTIALS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with BUILTIN_CREDENTIALS_PATH.open("w", encoding="utf-8") as outfile:
+        json.dump(credentials, outfile, indent=2, sort_keys=True)
+        outfile.write("\n")
+    try:
+        BUILTIN_CREDENTIALS_PATH.chmod(0o600)
+    except OSError:
+        pass
+
+
+def _persistent_builtin_password(username: str) -> str:
+    credentials = _load_builtin_credentials()
+    password = str(credentials.get(username, "")).strip()
+    if not password:
+        password = secrets.token_hex(BUILTIN_PASSWORD_BYTES)
+        credentials[username] = password
+        _save_builtin_credentials(credentials)
+    return password
 
 
 def _normalize_ip(value: str) -> str:
@@ -211,7 +248,8 @@ def ensure_builtin_moderator(
 
     - If an explicit password is provided, use it and return it.
     - Otherwise, if FURATIC_MOD_PASSWORD is configured, use that.
-    - Otherwise, rotate the password only when rotate_if_unset is True.
+    - Otherwise, reuse a generated password from config/builtin_credentials.json
+      when rotate_if_unset is True.
     """
     from django.contrib.auth.models import Group
 
@@ -239,7 +277,7 @@ def ensure_builtin_moderator(
         user.set_password(configured_password)
         returned_password = configured_password if password is not None else ""
     elif rotate_if_unset:
-        returned_password = secrets.token_urlsafe(18)
+        returned_password = _persistent_builtin_password(username)
         user.set_password(returned_password)
 
     user.save()
