@@ -27,6 +27,7 @@
             const COLOR_INDICATION = {% if color_indication %}true{% else %}false{% endif %};
 			const ADMIN = {% if is_admin %}true{% else %}false{% endif %};
 			const CONTROLS_ENABLED = {% if controls_enabled %}true{% else %}false{% endif %};
+			const RUNTIME_INSTANCE_ID = "{{ runtime_instance_id|default:'' }}";
             // Popper is only used for dropdowns and tooltips, neither of which is used
             // https://getbootstrap.com/docs/5.0/getting-started/introduction/
 			const Popper = function(){}
@@ -115,6 +116,7 @@
 		    }
 		
 		    let ownSongs = [];
+		    let ownCurrentSongKey = null;
 		    let ownSongDecorateTimer = null;
 		
 		    function showOwnSongToast(kind, message) {
@@ -132,22 +134,19 @@
 		        .removeClass('own-song-queue-entry')
 		        .find('.own-song-remove')
 		        .remove();
+		      $('#current-song').removeClass('own-song-current');
 		    }
 		
 		    function applyOwnSongDecorations() {
 		      clearOwnSongDecorations();
-		      if (!ownSongs.length) {
-		        return;
-		      }
 		
 		      ownSongs.forEach(function(song) {
-		        const position = Number(song.queuePosition);
 		        const queueKey = Number(song.queueKey);
-		        if (!position || !queueKey) {
+		        if (!queueKey) {
 		          return;
 		        }
 		
-		        const item = $('#song-queue > li').eq(position - 1);
+		        const item = $('#song-queue > li[data-queue-key="' + queueKey + '"]').first();
 		        if (!item.length) {
 		          return;
 		        }
@@ -165,12 +164,19 @@
 		            .appendTo(item);
 		        }
 		      });
+		
+		      const currentSongKey = Number(ownCurrentSongKey);
+		      const currentSong = $('#current-song');
+		      if (currentSongKey && currentSong.length && Number(currentSong.attr('data-queue-key')) === currentSongKey) {
+		        currentSong.addClass('own-song-current');
+		      }
 		    }
 		
 		    function refreshOwnSongState() {
 		      $.get(urls['musiq']['own-song-state'])
 		        .done(function(response) {
 		          ownSongs = Array.isArray(response.songs) ? response.songs : [];
+		          ownCurrentSongKey = response.currentSongQueueKey ? Number(response.currentSongQueueKey) : null;
 		          applyOwnSongDecorations();
 		        });
 		    }
@@ -200,11 +206,15 @@
 		    });
 		
 		    const songQueueNode = document.getElementById('song-queue');
+		    const currentSongNode = document.getElementById('current-song');
 		    const observer = new MutationObserver(function() {
 		      window.clearTimeout(ownSongDecorateTimer);
 		      ownSongDecorateTimer = window.setTimeout(applyOwnSongDecorations, 40);
 		    });
 		    observer.observe(songQueueNode, {childList: true, subtree: true});
+		    if (currentSongNode) {
+		      observer.observe(currentSongNode, {attributes: true, childList: true, subtree: false});
+		    }
 		
 		    refreshOwnSongState();
 		    window.setInterval(refreshOwnSongState, 4000);
