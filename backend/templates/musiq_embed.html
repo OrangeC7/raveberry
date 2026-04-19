@@ -114,7 +114,62 @@
     }
 
     #music-input-card {
-        padding: 6px 8px !important;
+        padding: 8px 10px !important;
+        display: flex !important;
+        align-items: center;
+        gap: 10px;
+    }
+
+    #music-input-card .clearable {
+        position: relative;
+        margin: 0 !important;
+        flex: 1 1 auto;
+        display: flex;
+        align-items: center;
+        min-height: 48px;
+        padding: 0 14px;
+        border-radius: 15px;
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    #music-input-card #music-input {
+        width: 100%;
+        min-width: 0;
+        padding: 0 !important;
+        background: transparent !important;
+        border: 0 !important;
+        outline: none !important;
+        box-shadow: none !important;
+        color: var(--furatic-text) !important;
+        height: auto;
+    }
+
+    #music-input-card .anim-container {
+        flex: 0 0 48px;
+        width: 48px;
+        height: 48px;
+        min-width: 48px;
+        margin: 0 !important;
+        border-radius: 15px;
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.10);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+
+    #music-input-card .anim-container i {
+        margin: 0 !important;
+    }
+
+    #clearbutton {
+        top: 50% !important;
+        right: 10px !important;
+        transform: translateY(-50%);
+        margin: 0 !important;
+        padding: 8px !important;
     }
 
     #music-input,
@@ -135,12 +190,30 @@
         color: var(--furatic-muted) !important;
     }
 
+    #current-song {
+        padding: 14px 16px !important;
+        gap: 14px !important;
+    }
+
+    .current-song-top-row {
+        min-height: 32px;
+    }
+
+    .current-song-main {
+        width: 100%;
+    }
+
     #progress-bar-container {
         padding: 0 !important;
+        width: 100%;
     }
 
     #progress-bar-container > .progress {
         background: rgba(255,255,255,0.08) !important;
+    }
+
+    #song-votes {
+        padding-top: 2px;
     }
 
     #progress-bar {
@@ -226,25 +299,29 @@
 
     <ul class="list-group" id="current-song-card">
         <li class="list-group-item empty" id="current-song">
-            {% if show_stream %}
-                <audio></audio>
-                <i class="fas fa-volume-mute" id="stream-control"></i>
-            {% endif %}
-            <div class="autoscrolling-container" {% if show_stream %}style="margin-right:32px"{% endif %}>
-                <span id="current-song-title">Currently Empty</span>
+            <div class="current-song-top-row">
+                {% if show_stream %}
+                    <audio></audio>
+                    <i class="fas fa-volume-mute" id="stream-control"></i>
+                {% endif %}
+                <div class="current-song-main">
+                    <div class="autoscrolling-container">
+                        <span id="current-song-title">Currently Empty</span>
+                    </div>
+                </div>
             </div>
-        </li>
-        <li class="list-group-item" id="progress-bar-container">
-            <div class="progress">
-                <div id="progress-bar" class="progress-bar"></div>
+            <div id="progress-bar-container">
+                <div class="progress">
+                    <div id="progress-bar" class="progress-bar"></div>
+                </div>
             </div>
-        </li>
-        <li class="list-group-item" id="song-votes">
-            <div class="current-song-vote-indicators" id="current-song-upvote-indicators"></div>
-            <i class="fas fa-chevron-circle-up vote-up" id="current-song-vote-up"></i>
-            <span id="current-song-votes"></span>
-            <i class="fas fa-chevron-circle-down vote-down" id="current-song-vote-down"></i>
-            <div class="current-song-vote-indicators" id="current-song-downvote-indicators"></div>
+            <div id="song-votes">
+                <div class="current-song-vote-indicators" id="current-song-upvote-indicators"></div>
+                <i class="fas fa-chevron-circle-up vote-up" id="current-song-vote-up"></i>
+                <span id="current-song-votes"></span>
+                <i class="fas fa-chevron-circle-down vote-down" id="current-song-vote-down"></i>
+                <div class="current-song-vote-indicators" id="current-song-downvote-indicators"></div>
+            </div>
         </li>
     </ul>
 
