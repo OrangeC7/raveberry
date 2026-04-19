@@ -123,16 +123,36 @@ span.clearable input {
 #current-song {
 	text-align: center;
 	font-size: larger;
-	padding-left: 8px;
-	padding-right: 8px;
+	padding: 12px 14px;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.current-song-top-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-width: 0;
+}
+
+.current-song-main {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+#current-song .autoscrolling-container {
+	flex: 1 1 auto;
+	min-width: 0;
 }
 
 // audio stream
 #stream-control {
 	min-width: 32px;
-	padding-right: 5px;
+	padding-right: 0;
 	font-size: x-large;
-	float: left;
+	float: none;
+	flex-shrink: 0;
 }
 #stream-control.fa-volume-mute {
 	// move muted and not muted speakers to the same position
@@ -140,11 +160,14 @@ span.clearable input {
 }
 
 #progress-bar-container {
-	padding: 0px;
+	padding: 0;
+	width: 100%;
 }
 #progress-bar-container>.progress {
 	height: 5px;
 	background-color: var(--list-border);
+	border-radius: 999px;
+	overflow: hidden;
 }
 #progress-bar {
 	width: 0%;
@@ -156,6 +179,8 @@ span.clearable input {
 	justify-content: center;
 	align-items: center;
 	font-size: x-large;
+	gap: 4px;
+	width: 100%;
 }
 #current-song-votes {
 	flex-grow: 0;
@@ -293,6 +318,15 @@ $entry-height: 50px;
 	display: flex;
 	align-items: center;
 }
+.queue-entry.queue-voting-layout.queue-entry-ready .download-icon,
+.queue-entry.queue-voting-layout.queue-entry-ready .queue-index {
+	display: none !important;
+}
+.queue-entry.queue-voting-layout.queue-entry-ready .queue-title,
+.queue-entry.queue-voting-layout.queue-entry-ready .queue-info {
+	width: 100%;
+	padding-left: 0;
+}
 .vote-indicators {
 	display: flex;
 	align-items: center;
@@ -311,8 +345,29 @@ $entry-height: 50px;
 .queue-info-controls {
 	margin: auto 0 auto auto;
 	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	gap: 10px;
 }
-.queue-info-controls>i {
+.queue-vote-cluster,
+.queue-admin-controls {
+	display: inline-flex;
+	align-items: center;
+}
+.queue-vote-cluster {
+	gap: 8px;
+}
+.queue-vote-cluster > i {
+	padding: 0;
+}
+.queue-vote-count {
+	min-width: 2ch;
+	text-align: center;
+	font-size: medium;
+	font-weight: bold;
+}
+.queue-admin-controls > i,
+.queue-info-controls > i {
 	padding-left: 8px;
 	padding-right: 8px;
 }
@@ -323,6 +378,14 @@ $entry-height: 50px;
 	box-shadow:
 		inset 0 0 0 1px rgba(90, 220, 255, 0.22),
 		0 0 16px rgba(90, 220, 255, 0.08) !important;
+}
+
+.own-song-current {
+	background:
+		linear-gradient(180deg, rgba(90, 220, 255, 0.10), rgba(90, 220, 255, 0.04)) !important;
+	box-shadow:
+		inset 0 0 0 1px rgba(90, 220, 255, 0.26),
+		0 0 20px rgba(90, 220, 255, 0.12) !important;
 }
 
 .own-song-remove {
