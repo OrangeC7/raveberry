@@ -2,6 +2,7 @@
 
 import os
 import random
+import secrets
 from typing import Any, Dict
 
 from django.core.handlers.wsgi import WSGIRequest
@@ -72,6 +73,8 @@ def _furatic_public_context() -> Dict[str, Any]:
         "hls_url": conf.FURATIC_HLS_URL,
     }
 
+RUNTIME_INSTANCE_ID = secrets.token_hex(8)
+
 
 def _increment_counter() -> int:
     with transaction.atomic():
@@ -116,6 +119,7 @@ def context(request: WSGIRequest) -> Dict[str, Any]:
         "can_moderate": user_manager.can_moderate(request.user),
         "apk_link": _get_apk_link(),
         "static_asset_version": _static_asset_version(),
+        "runtime_instance_id": RUNTIME_INSTANCE_ID,
         "local_enabled": storage.get("local_enabled"),
         "youtube_enabled": storage.get("youtube_enabled"),
         "spotify_enabled": storage.get("spotify_enabled"),
