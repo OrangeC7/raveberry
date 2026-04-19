@@ -1,24 +1,31 @@
 import {state} from './update';
 import {
-  localStorageGet, localStorageSet,
+  localStorageGet,
   infoToast, successToast, warningToast, errorToast,
 } from '../base';
+import {setStoredVote} from './vote-state';
 
 /** Finds the song key to a given HTML element.
  * @param {HTMLElement} element an element that is part of a queue entry
  * @return {number} id of the song represented in the entry
  */
 export function keyOfElement(element) {
+  const keyedElement = element.closest('[data-queue-key]');
+  const queueKey = Number(keyedElement.attr('data-queue-key'));
+  if (Number.isFinite(queueKey) && queueKey > 0) {
+    return queueKey;
+  }
+
   // takes a jquery element and returns the index of it in the song queue
   let index = element.closest('.queue-entry').parent().index();
   // if the element is currently being reordered,
   // look into its index span for the index
   if (index == -1) {
     let el = element.find('.queue-index');
-    if (index.length == 0) {
+    if (el.length == 0) {
       el = element.closest('.queue-entry').find('.queue-index');
     }
-    index = el.text() - 1;
+    index = Number(el.text()) - 1;
   }
   return state.songQueue[index].id;
 }
@@ -73,7 +80,7 @@ export function requestArchivedMusic(key, query,
         platform: platform,
       }).done(function(response) {
     successToast(response.message, '"' + query + '"');
-    localStorageSet('vote-' + response.key, '+', 7);
+    setStoredVote(response.key, '+');
   }).fail(function(response) {
     errorToast(response.responseText, '"' + query + '"');
   });
@@ -94,7 +101,7 @@ export function requestNewMusic(query, platform = localStorageGet('platform')) {
         platform: platform,
       }).done(function(response) {
     successToast(response.message, '"' + query + '"');
-    localStorageSet('vote-' + response.key, '+', 7);
+    setStoredVote(response.key, '+');
   }).fail(function(response) {
     errorToast(response.responseText, '"' + query + '"');
   });
