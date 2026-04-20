@@ -66,8 +66,9 @@ export function onReady() {
     });
   }
 
-  function shouldIgnoreActivation(event: any) {
+  function shouldIgnoreActivation(event) {
     const originalEvent = event.originalEvent || event;
+
     if (event.type === 'pointerup') {
       if (originalEvent && originalEvent.pointerType === 'mouse' && originalEvent.button !== 0) {
         return true;
@@ -77,14 +78,17 @@ export function onReady() {
       }
       return false;
     }
+
     if (event.type === 'touchend') {
       lastTouchActivation = Date.now();
       event.preventDefault();
       return false;
     }
+
     if (event.type === 'click' && Date.now() - lastTouchActivation < 450) {
       return true;
     }
+
     return false;
   }
 
@@ -116,11 +120,13 @@ export function onReady() {
     function applyVisualVoteState(value) {
       up.removeClass('pressed');
       down.removeClass('pressed');
+
       if (value === '+') {
         up.addClass('pressed');
       } else if (value === '-') {
         down.addClass('pressed');
       }
+
       setStoredVote(key, value);
     }
 
@@ -154,6 +160,7 @@ export function onReady() {
     }
     handleVotePress(this, 'up');
   });
+
   $('#content').on(activationEvents, '.vote-down', function(event) {
     if (shouldIgnoreActivation(event)) {
       return;
