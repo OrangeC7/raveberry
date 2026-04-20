@@ -911,8 +911,10 @@
         const toggleButton = document.getElementById("tv-toggle");
         const closeButton = document.getElementById("tv-close");
         const video = document.getElementById("tv-player");
+
         let hlsInstance = null;
         let hasLoadedStream = false;
+        let pendingPlayAttempt = false;
 
         function canUseNativeHls() {
           return video.canPlayType("application/vnd.apple.mpegurl");
@@ -926,10 +928,12 @@
           if (hasLoadedStream || !hlsUrl) {
             return;
           }
+
           hasLoadedStream = true;
 
           if (canUseNativeHls()) {
             video.src = hlsUrl;
+            video.load();
             return;
           }
 
@@ -937,7 +941,8 @@
             hlsInstance = new window.Hls({
               enableWorker: true,
               lowLatencyMode: true,
-              backBufferLength: 20,
+              backBufferLength: 12,
+              liveSyncDurationCount: 3,
             });
             hlsInstance.loadSource(hlsUrl);
             hlsInstance.attachMedia(video);
@@ -950,15 +955,106 @@
           toggleButton.setAttribute("title", open ? "Hide TV panel" : "Open TV panel");
         }
 
-        function setOpen(open) {
-          playerLayout.classList.toggle("is-tv-open", open);
-          panel.classList.toggle("is-open", open);
-          panel.setAttribute("aria-hidden", open ? "false" : "true");
-          syncTvToggle(open);
-          if (open) {
-            ensureStream();
-          } else {
+        function jumpToLiveEdge() {
+          try {
+            if (
+              hlsInstance &&
+              typeof hlsInstance.liveSyncPosition === "number" &&
+              Number.isFinite(hlsInstance.liveSyncPosition)
+            ) {
+              video.currentTime = Math.max(0, hlsInstance.liveSyncPosition);
+              return true;
+            }
+          } catch (_error) {
+            // ignore
+          }
+
+          try {
+            if (video.seekable && video.seekable.length > 0) {
+              const liveEdge = video.seekable.end(video.seekable.length - 1);
+              if (Number.isFinite(liveEdge) && liveEdge > 0) {
+                video.currentTime = Math.max(0, liveEdge - 0.35);
+                return true;
+              }
+            }
+          } catch (_error) {
+            // ignore
+          }
+
+          return false;
+        }
+
+        function refreshToLiveSource() {
+          if (!hasLoadedStream) {
+            return;
+          }
+
+          if (hlsInstance) {
+            if (typeof hlsInstance.stopLoad === "function") {
+              hlsInstance.stopLoad();
+            }
+            if (typeof hlsInstance.startLoad === "function") {
+              hlsInstance.startLoad(-1);
+            }
+            jumpToLiveEdge();
+            return;
+          }
+
+          if (canUseNativeHls()) {
+            const wasMuted = video.muted;
             video.pause();
+            video.removeAttribute("src");
+            video.load();
+            video.src = hlsUrl;
+            video.muted = wasMuted;
+            video.load();
+          }
+        }
+
+        async function tryPlayLive() {
+          pendingPlayAttempt = false;
+
+          try {
+            video.muted = false;
+            await video.play();
+            return;
+          } catch (_error) {
+            // browser blocked autoplay with sound
+          }
+
+          try {
+            video.muted = true;
+            await video.play();
+          } catch (_error) {
+            // give up silently
+          }
+        }
+
+        function openTv() {
+          playerLayout.classList.add("is-tv-open");
+          panel.classList.add("is-open");
+          panel.setAttribute("aria-hidden", "false");
+          syncTvToggle(true);
+
+          pendingPlayAttempt = true;
+          ensureStream();
+          refreshToLiveSource();
+          jumpToLiveEdge();
+
+          void tryPlayLive();
+        }
+
+        function closeTv() {
+          pendingPlayAttempt = false;
+          playerLayout.classList.remove("is-tv-open");
+          panel.classList.remove("is-open");
+          panel.setAttribute("aria-hidden", "true");
+          syncTvToggle(false);
+
+          video.pause();
+
+          if (hlsInstance && typeof hlsInstance.stopLoad === "function") {
+            hlsInstance.stopLoad();
           }
         }
 
@@ -972,15 +1068,41 @@
         syncTvToggle(false);
 
         toggleButton.addEventListener("click", function () {
-          setOpen(!panel.classList.contains("is-open"));
+          if (panel.classList.contains("is-open")) {
+            closeTv();
+          } else {
+            openTv();
+          }
         });
 
         closeButton.addEventListener("click", function () {
-          setOpen(false);
+          closeTv();
+        });
+
+        video.addEventListener("loadedmetadata", function () {
+          if (panel.classList.contains("is-open")) {
+            jumpToLiveEdge();
+            if (pendingPlayAttempt) {
+              void tryPlayLive();
+            }
+          }
+        });
+
+        video.addEventListener("canplay", function () {
+          if (panel.classList.contains("is-open")) {
+            jumpToLiveEdge();
+            if (pendingPlayAttempt) {
+              void tryPlayLive();
+            }
+          }
+        });
+
+        video.addEventListener("playing", function () {
+          if (panel.classList.contains("is-open")) {
+            jumpToLiveEdge();
+          }
         });
       })();
-
-      let redirectingToAfterHours = false;
       
       async function pollMode() {
         try {
