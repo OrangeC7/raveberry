@@ -240,12 +240,12 @@
         opacity: 1;
         background:
             radial-gradient(
-                circle 136px at var(--furatic-orb-x) var(--furatic-orb-y),
-                rgba(170, 246, 255, 0.24) 0%,
-                rgba(132, 236, 255, 0.18) 18%,
-                rgba(86, 220, 255, 0.11) 36%,
-                rgba(78, 210, 255, 0.05) 54%,
-                rgba(78, 210, 255, 0.00) 72%
+                circle 152px at var(--furatic-orb-x) var(--furatic-orb-y),
+                rgba(170, 246, 255, 0.28) 0%,
+                rgba(132, 236, 255, 0.20) 18%,
+                rgba(86, 220, 255, 0.12) 36%,
+                rgba(78, 210, 255, 0.055) 56%,
+                rgba(78, 210, 255, 0.00) 74%
             ),
             linear-gradient(180deg, rgba(78, 210, 255, 0.022), rgba(255,255,255,0));
         box-shadow:
@@ -253,6 +253,9 @@
             inset 0 -18px 28px rgba(34, 96, 146, 0.10),
             0 0 16px rgba(86, 220, 255, 0.06),
             0 0 30px rgba(86, 220, 255, 0.04);
+        transition:
+            opacity 260ms ease,
+            box-shadow 260ms ease;
     }
     
     .list-group-item.furatic-owned-song.is-removing {
@@ -786,12 +789,12 @@
             return;
         }
 
-        const baseX = 14 + Math.random() * 14;
-        const baseY = 17 + Math.random() * 16;
-        const ampX = 2.0 + Math.random() * 3.8;
-        const ampY = 1.8 + Math.random() * 3.4;
-        const speedX = 0.55 + Math.random() * 0.42;
-        const speedY = 0.48 + Math.random() * 0.36;
+        const baseX = 16 + Math.random() * 12;
+        const baseY = 18 + Math.random() * 14;
+        const ampX = 4.8 + Math.random() * 3.6;
+        const ampY = 3.9 + Math.random() * 3.0;
+        const speedX = 0.96 + Math.random() * 0.34;
+        const speedY = 0.82 + Math.random() * 0.28;
         const phaseX = Math.random() * Math.PI * 2;
         const phaseY = Math.random() * Math.PI * 2;
 
@@ -823,28 +826,28 @@
             return;
         }
 
-        const t = now * 0.00022;
+        const t = now * 0.00052;
 
         ownedElements.forEach(function (element) {
-            const baseX = Number(element.dataset.furaticOrbBaseX || 18);
+            const baseX = Number(element.dataset.furaticOrbBaseX || 22);
             const baseY = Number(element.dataset.furaticOrbBaseY || 24);
-            const ampX = Number(element.dataset.furaticOrbAmpX || 3.2);
-            const ampY = Number(element.dataset.furaticOrbAmpY || 2.8);
-            const speedX = Number(element.dataset.furaticOrbSpeedX || 0.72);
-            const speedY = Number(element.dataset.furaticOrbSpeedY || 0.58);
+            const ampX = Number(element.dataset.furaticOrbAmpX || 6.0);
+            const ampY = Number(element.dataset.furaticOrbAmpY || 4.8);
+            const speedX = Number(element.dataset.furaticOrbSpeedX || 1.08);
+            const speedY = Number(element.dataset.furaticOrbSpeedY || 0.94);
             const phaseX = Number(element.dataset.furaticOrbPhaseX || 0);
             const phaseY = Number(element.dataset.furaticOrbPhaseY || 0);
 
             const x = baseX
                 + Math.sin(t * speedX + phaseX) * ampX
-                + Math.sin(t * speedY * 0.63 + phaseY * 1.17) * (ampX * 0.26);
+                + Math.sin(t * speedY * 0.74 + phaseY * 1.13) * (ampX * 0.34);
 
             const y = baseY
                 + Math.cos(t * speedY + phaseY) * ampY
-                + Math.cos(t * speedX * 0.57 + phaseX * 0.91) * (ampY * 0.24);
+                + Math.cos(t * speedX * 0.61 + phaseX * 0.88) * (ampY * 0.30);
 
-            const clampedX = Math.max(10, Math.min(34, x));
-            const clampedY = Math.max(12, Math.min(38, y));
+            const clampedX = Math.max(10, Math.min(38, x));
+            const clampedY = Math.max(12, Math.min(40, y));
 
             element.style.setProperty("--furatic-orb-x", clampedX.toFixed(2) + "%");
             element.style.setProperty("--furatic-orb-y", clampedY.toFixed(2) + "%");
