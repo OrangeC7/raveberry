@@ -1,6 +1,7 @@
 import {keyOfElement} from './buttons';
 import {state} from './update';
-import {localStorageSet, warningToastWithBar, errorToast} from '../base';
+import {warningToastWithBar, errorToast} from '../base';
+import {setStoredVote} from './vote-state';
 
 /** Adds handlers to buttons that are visible when voting is enabled. */
 export function onReady() {
@@ -43,17 +44,19 @@ export function onReady() {
    * @param {number} key the key of the voted song
    * @param {number} amount the amount of votes, from -2 to +2. */
   function vote(button, key, amount) {
-    let votes = button.closest('.queue-entry').find('.queue-index');
+    let votes = button.closest('.queue-entry').find('.queue-vote-count');
     if (votes.length == 0) {
       votes = button.siblings('#current-song-votes');
     }
-    votes.text(parseInt(votes.text()) + amount);
+    const currentVotes = Number(votes.text()) || 0;
+    votes.text(String(currentVotes + amount));
     $.post(urls['musiq']['vote'], {
       key: key,
       amount: amount,
     }).fail(function(response) {
       errorToast(response.responseText);
-      votes.text(parseInt(votes.text()) - amount);
+      const failedVotes = Number(votes.text()) || 0;
+      votes.text(String(failedVotes - amount));
     });
   }
 
@@ -76,7 +79,7 @@ export function onReady() {
     const other = $(this).siblings('.vote-down');
     if ($(this).hasClass('pressed')) {
       $(this).removeClass('pressed');
-      localStorageSet('vote-' + key, '0', 7);
+      setStoredVote(key, '0');
       vote($(this), key, -1);
     } else {
       $(this).addClass('pressed');
@@ -86,7 +89,7 @@ export function onReady() {
       } else {
         vote($(this), key, 1);
       }
-      localStorageSet('vote-' + key, '+', 7);
+      setStoredVote(key, '+');
     }
   });
   $('#content').on('click tap', '.vote-down', function() {
@@ -108,7 +111,7 @@ export function onReady() {
     const other = $(this).siblings('.vote-up');
     if ($(this).hasClass('pressed')) {
       $(this).removeClass('pressed');
-      localStorageSet('vote-' + key, '0', 7);
+      setStoredVote(key, '0');
       vote($(this), key, 1);
     } else {
       $(this).addClass('pressed');
@@ -118,7 +121,7 @@ export function onReady() {
       } else {
         vote($(this), key, -1);
       }
-      localStorageSet('vote-' + key, '-', 7);
+      setStoredVote(key, '-');
     }
   });
 }
