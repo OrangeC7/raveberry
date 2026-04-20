@@ -155,6 +155,7 @@
     .list-group-item {
         position: relative;
         overflow: hidden;
+        isolation: isolate;
         border-radius: 18px !important;
         border: 1px solid var(--furatic-border) !important;
         background: var(--furatic-panel) !important;
@@ -162,6 +163,12 @@
         -webkit-backdrop-filter: blur(18px) saturate(120%);
         backdrop-filter: blur(18px) saturate(120%);
         color: var(--furatic-text) !important;
+        transition:
+            background 240ms ease,
+            box-shadow 240ms ease,
+            transform 240ms ease,
+            opacity 220ms ease,
+            filter 220ms ease;
     }
 
     .list-group-item::before {
@@ -177,33 +184,140 @@
             background 260ms ease,
             opacity 260ms ease;
     }
-    
-    .list-group-item.furatic-owned-song {
-        border-color: rgba(88, 220, 255, 0.28) !important;
-        background:
-            linear-gradient(180deg, rgba(44, 180, 255, 0.09), rgba(26, 118, 210, 0.045)),
-            var(--furatic-panel) !important;
-        box-shadow:
-            0 0 0 1px rgba(88, 220, 255, 0.05),
-            0 16px 34px rgba(0, 0, 0, 0.24),
-            0 10px 28px rgba(48, 186, 255, 0.10);
-    }
-    
-    .list-group-item.furatic-owned-song::before {
-        background:
-            radial-gradient(circle at top left, rgba(122, 232, 255, 0.15), transparent 32%),
-            linear-gradient(180deg, rgba(122, 232, 255, 0.055), rgba(255,255,255,0));
-    }
-    
-    .list-group-item.furatic-owned-song::after {
+
+    .list-group-item::after {
         content: "";
         position: absolute;
         inset: 0;
         border-radius: inherit;
         pointer-events: none;
-        box-shadow: inset 0 0 0 1px rgba(122, 232, 255, 0.08);
+        opacity: 0;
+        transition:
+            opacity 260ms ease,
+            box-shadow 260ms ease,
+            background 260ms ease;
     }
-    
+
+    .list-group-item.furatic-owned-song {
+        border-color: var(--furatic-border) !important;
+        background:
+            radial-gradient(circle at 12% 24%, rgba(114, 232, 255, 0.13), transparent 36%),
+            linear-gradient(180deg, rgba(40, 154, 224, 0.08), rgba(23, 72, 142, 0.035)),
+            var(--furatic-panel) !important;
+        box-shadow:
+            0 16px 34px rgba(0, 0, 0, 0.24),
+            0 0 0 1px rgba(114, 232, 255, 0.025),
+            0 0 26px rgba(86, 220, 255, 0.10),
+            0 0 56px rgba(38, 180, 255, 0.06);
+    }
+
+    .list-group-item.furatic-owned-song::before {
+        background:
+            radial-gradient(circle at 16% 22%, rgba(148, 240, 255, 0.22), transparent 32%),
+            radial-gradient(circle at 82% 84%, rgba(64, 176, 255, 0.10), transparent 34%),
+            linear-gradient(180deg, rgba(132, 236, 255, 0.06), rgba(255,255,255,0));
+    }
+
+    .list-group-item.furatic-owned-song::after {
+        opacity: 1;
+        background:
+            radial-gradient(circle at 18% 18%, rgba(150, 242, 255, 0.08), transparent 34%),
+            linear-gradient(180deg, rgba(78, 210, 255, 0.035), rgba(255,255,255,0));
+        box-shadow:
+            inset 0 1px 0 rgba(170, 246, 255, 0.09),
+            inset 0 -18px 28px rgba(34, 96, 146, 0.12),
+            0 0 18px rgba(86, 220, 255, 0.07),
+            0 0 36px rgba(86, 220, 255, 0.04);
+    }
+
+    .list-group-item.furatic-owned-song.is-removing {
+        opacity: 0.78;
+        filter: saturate(0.92);
+    }
+
+    .list-group-item.furatic-self-remove-fade {
+        opacity: 0 !important;
+        transform: translate3d(-16px, 0, 0) scale(0.986) !important;
+        filter: blur(10px) !important;
+    }
+
+    .list-group-item.furatic-owned-song .queue-title,
+    .list-group-item.furatic-owned-song .queue-info {
+        width: calc(100% - 36px);
+        padding-left: 36px;
+    }
+
+    .list-group-item.furatic-owned-song .queue-entry.queue-voting-layout.queue-entry-ready .queue-title,
+    .list-group-item.furatic-owned-song .queue-entry.queue-voting-layout.queue-entry-ready .queue-info {
+        width: calc(100% - 36px);
+        padding-left: 36px;
+    }
+
+    .list-group-item.furatic-owned-song .download-icon,
+    .list-group-item.furatic-owned-song .queue-index {
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .own-song-remove {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        z-index: 4;
+        width: 28px;
+        height: 28px;
+        border: 0;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        color: rgba(244, 251, 255, 0.96);
+        background:
+            linear-gradient(180deg, rgba(112, 228, 255, 0.20), rgba(74, 188, 255, 0.12));
+        box-shadow:
+            inset 0 1px 0 rgba(255,255,255,0.10),
+            0 8px 18px rgba(0, 0, 0, 0.18),
+            0 0 16px rgba(84, 220, 255, 0.08);
+        opacity: 0;
+        transform: translateY(-50%) scale(0.94);
+        transition:
+            opacity 180ms ease,
+            transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+            background 180ms ease,
+            box-shadow 180ms ease;
+        cursor: pointer;
+        pointer-events: auto;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+    }
+
+    .own-song-remove.is-visible {
+        opacity: 1;
+        transform: translateY(-50%) scale(1);
+    }
+
+    .own-song-remove:hover,
+    .own-song-remove:focus-visible {
+        background:
+            linear-gradient(180deg, rgba(122, 236, 255, 0.28), rgba(88, 198, 255, 0.16));
+        box-shadow:
+            inset 0 1px 0 rgba(255,255,255,0.12),
+            0 10px 22px rgba(0, 0, 0, 0.22),
+            0 0 18px rgba(84, 220, 255, 0.11);
+        outline: none;
+    }
+
+    .own-song-remove:active {
+        transform: translateY(-50%) scale(0.96);
+    }
+
+    .own-song-remove:disabled {
+        opacity: 0.62;
+        cursor: wait;
+        transform: translateY(-50%) scale(0.96);
+    }
+
     .list-group-item.furatic-owned-song #current-song-title,
     .list-group-item.furatic-owned-song .queue-entry,
     .list-group-item.furatic-owned-song .queue-entry *,
@@ -379,13 +493,35 @@
         color: rgba(255,255,255,0.92) !important;
     }
 
+
+    .queue-info-controls,
+    .queue-vote-cluster,
+    #song-votes {
+        position: relative;
+        z-index: 3;
+        pointer-events: auto;
+    }
+
     .vote-up,
     .vote-down {
-        display: inline-block;
+        position: relative;
+        z-index: 4;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 34px;
+        min-height: 34px;
+        padding: 6px;
+        border-radius: 999px;
         transform: translateY(0) scale(1);
         transform-origin: center center;
         backface-visibility: hidden;
         will-change: transform;
+        pointer-events: auto;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+        user-select: none;
+        cursor: pointer;
     }
     
     .vote-up.pressed {
@@ -527,159 +663,19 @@
 <script>
 (function () {
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const OWNED_PENDING_KEY = "furatic-owned-song-pending-v1";
-    const OWNED_CLAIMS_KEY = "furatic-owned-song-claims-v1";
-    const OWNED_PENDING_TTL = 90 * 1000;
-    const OWNED_CLAIM_TTL = 60 * 60 * 1000;
-    const MAX_PENDING = 6;
-    const MAX_CLAIMS = 12;
+    const OWN_SONG_POLL_MS = 3500;
+    const OWN_SONG_REFRESH_BURST = [260, 900, 1800];
+    const ownQueueKeys = new Set();
+    const pendingRemovals = new Set();
 
-    let previousQueueSnapshot = [];
-    let scanScheduled = false;
+    let ownCurrentSongKey = null;
+    let decorateQueued = false;
 
-    function now() {
-        return Date.now();
-    }
-
-    function readStorage(key) {
-        try {
-            const parsed = JSON.parse(window.localStorage.getItem(key) || "[]");
-            return Array.isArray(parsed) ? parsed : [];
-        } catch (_error) {
-            return [];
-        }
-    }
-
-    function writeStorage(key, value) {
-        try {
-            window.localStorage.setItem(key, JSON.stringify(value));
-        } catch (_error) {
-            // ignore storage errors
-        }
-    }
-
-    function prunePending(items) {
-        const time = now();
-        return items.filter(function (item) {
-            return item && item.expiresAt > time && !item.claimedAt;
-        }).slice(-MAX_PENDING);
-    }
-
-    function pruneClaims(items) {
-        const time = now();
-        return items.filter(function (item) {
-            return item && item.expiresAt > time && !item.retiredAt;
-        }).slice(-MAX_CLAIMS);
-    }
-
-    function normalizeText(value) {
-        return String(value || "")
-            .toLowerCase()
-            .normalize("NFKD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .replace(/https?:\/\/\S+/g, " ")
-            .replace(/[`~!@#$%^&*()_|+\-=?;:'",.<>{}\[\]\\\/]/g, " ")
-            .replace(/\s+/g, " ")
-            .trim();
-    }
-
-    function normalizeHref(value) {
-        const href = String(value || "").trim();
-        if (!href) {
-            return "";
-        }
-
-        try {
-            return new URL(href, window.location.origin).href;
-        } catch (_error) {
-            return href;
-        }
-    }
-
-    function tokenize(value) {
-        return normalizeText(value).split(" ").filter(function (token) {
-            return token.length > 2;
-        });
-    }
-
-    function getPrimaryText(element) {
-        if (!element) {
-            return "";
-        }
-
-        const preferred =
-            element.querySelector(".queue-entry")?.innerText ||
-            element.querySelector("#current-song-title")?.innerText ||
-            element.querySelector("[title]")?.getAttribute("title") ||
-            element.getAttribute("title") ||
-            element.innerText ||
-            element.textContent ||
-            "";
-
-        return normalizeText(preferred);
-    }
-
-    function getPrimaryHref(element) {
-        if (!element) {
-            return "";
-        }
-
-        const anchor = element.querySelector("a[href]");
-        return normalizeHref(anchor ? anchor.getAttribute("href") : "");
-    }
-
-    function makeElementSignature(element) {
-        const text = getPrimaryText(element);
-        const href = getPrimaryHref(element);
-        const fingerprint = (href ? "h:" + href : "h:") + "|t:" + text.slice(0, 180);
-
-        return {
-            text: text,
-            href: href,
-            fingerprint: fingerprint
-        };
-    }
-
-    function signaturesMatch(a, b) {
-        if (!a || !b) {
-            return false;
-        }
-
-        if (a.href && b.href && a.href === b.href) {
-            return true;
-        }
-
-        if (!a.text || !b.text) {
-            return false;
-        }
-
-        if (a.text === b.text) {
-            return true;
-        }
-
-        const shorter = a.text.length <= b.text.length ? a.text : b.text;
-        const longer = a.text.length > b.text.length ? a.text : b.text;
-
-        if (shorter.length >= 12 && longer.includes(shorter)) {
-            return true;
-        }
-
-        const aTokens = tokenize(a.text);
-        const bTokens = tokenize(b.text);
-
-        if (!aTokens.length || !bTokens.length) {
-            return false;
-        }
-
-        let overlap = 0;
-        for (const token of aTokens) {
-            if (bTokens.includes(token)) {
-                overlap += 1;
-            }
-        }
-
-        const smallerCount = Math.min(aTokens.length, bTokens.length);
-        return overlap >= Math.min(3, smallerCount) && (overlap / smallerCount) >= 0.6;
+    try {
+        window.localStorage.removeItem("furatic-owned-song-pending-v1");
+        window.localStorage.removeItem("furatic-owned-song-claims-v1");
+    } catch (_error) {
+        // ignore storage cleanup failures
     }
 
     function getQueueRows() {
@@ -690,207 +686,115 @@
         return document.getElementById("current-song");
     }
 
-    function getCurrentQueueSnapshot() {
-        return getQueueRows().map(function (row) {
-            return makeElementSignature(row).fingerprint;
+    function getQueueKey(element) {
+        const value = Number(element && element.getAttribute("data-queue-key"));
+        return Number.isFinite(value) && value > 0 ? value : null;
+    }
+
+    function showInlineError(message) {
+        const text = String(message || "Could not complete that action.");
+        $("#info-toast, #success-toast, #warning-toast").fadeOut();
+        $("#error-toast").find(".toast-content").text(text);
+        $("#error-toast").stop(true, true).fadeIn();
+        window.setTimeout(function () {
+            $("#error-toast").fadeOut();
+        }, 2200);
+    }
+
+    function scheduleDecorate() {
+        if (decorateQueued) {
+            return;
+        }
+        decorateQueued = true;
+        window.requestAnimationFrame(function () {
+            decorateQueued = false;
+            applyOwnSongDecorations();
         });
     }
 
-    function getNewRowsSinceLastSnapshot(rows) {
-        const previousCounts = new Map();
+    function applyOwnSongDecorations() {
+        getQueueRows().forEach(function (row) {
+            const key = getQueueKey(row);
+            const isOwned = key !== null && ownQueueKeys.has(key);
+            row.classList.toggle("furatic-owned-song", isOwned);
+            row.classList.toggle("is-removing", key !== null && pendingRemovals.has(key));
 
-        for (const fingerprint of previousQueueSnapshot) {
-            previousCounts.set(fingerprint, (previousCounts.get(fingerprint) || 0) + 1);
-        }
-
-        const seenNowCounts = new Map();
-        const newRows = [];
-
-        for (const row of rows) {
-            const fingerprint = makeElementSignature(row).fingerprint;
-            const seenCount = seenNowCounts.get(fingerprint) || 0;
-            const previousCount = previousCounts.get(fingerprint) || 0;
-
-            if (seenCount >= previousCount) {
-                newRows.push(row);
+            let button = row.querySelector(".own-song-remove");
+            if (!isOwned) {
+                if (button) {
+                    button.remove();
+                }
+                return;
             }
 
-            seenNowCounts.set(fingerprint, seenCount + 1);
-        }
+            if (!button) {
+                button = document.createElement("button");
+                button.type = "button";
+                button.className = "own-song-remove";
+                button.setAttribute("aria-label", "Remove your song from the queue");
+                button.setAttribute("title", "Remove your song from the queue");
+                button.innerHTML = '<i class="fas fa-times" aria-hidden="true"></i>';
+                row.appendChild(button);
 
-        return newRows;
-    }
+                if (prefersReducedMotion) {
+                    button.classList.add("is-visible");
+                } else {
+                    window.requestAnimationFrame(function () {
+                        button.classList.add("is-visible");
+                    });
+                }
+            }
 
-    function queuePendingSubmission(rawInput) {
-        const normalizedInput = normalizeText(rawInput);
-
-        if (!normalizedInput) {
-            return;
-        }
-
-        const pending = prunePending(readStorage(OWNED_PENDING_KEY));
-        pending.push({
-            id: "pending_" + now() + "_" + Math.random().toString(36).slice(2, 8),
-            rawInput: String(rawInput || ""),
-            normalizedInput: normalizedInput,
-            createdAt: now(),
-            expiresAt: now() + OWNED_PENDING_TTL
+            if (key !== null) {
+                button.setAttribute("data-queue-key", String(key));
+                button.disabled = pendingRemovals.has(key);
+            }
         });
-        writeStorage(OWNED_PENDING_KEY, pending);
-    }
-
-    function claimNewRows(rows) {
-        let pending = prunePending(readStorage(OWNED_PENDING_KEY));
-        if (!pending.length || !rows.length) {
-            return;
-        }
-
-        let claims = pruneClaims(readStorage(OWNED_CLAIMS_KEY));
-        let changed = false;
-
-        for (const row of rows) {
-            if (!pending.length) {
-                break;
-            }
-
-            const signature = makeElementSignature(row);
-            if (!signature.text && !signature.href) {
-                continue;
-            }
-
-            const nextPending = pending.shift();
-            claims.push({
-                id: "claim_" + now() + "_" + Math.random().toString(36).slice(2, 8),
-                pendingId: nextPending.id,
-                text: signature.text,
-                href: signature.href,
-                createdAt: now(),
-                expiresAt: now() + OWNED_CLAIM_TTL,
-                seenCurrent: false,
-                lastSeenAt: now()
-            });
-            nextPending.claimedAt = now();
-            changed = true;
-        }
-
-        if (changed) {
-            writeStorage(OWNED_PENDING_KEY, prunePending(pending));
-            writeStorage(OWNED_CLAIMS_KEY, pruneClaims(claims));
-        }
-    }
-
-    function clearOwnedHighlights() {
-        document.querySelectorAll(".furatic-owned-song").forEach(function (element) {
-            element.classList.remove("furatic-owned-song");
-        });
-    }
-
-    function applyOwnedHighlights() {
-        clearOwnedHighlights();
-
-        const claims = pruneClaims(readStorage(OWNED_CLAIMS_KEY));
-        if (!claims.length) {
-            return;
-        }
 
         const currentSongRow = getCurrentSongRow();
         if (currentSongRow) {
-            const currentSignature = makeElementSignature(currentSongRow);
-            if (claims.some(function (claim) { return signaturesMatch(claim, currentSignature); })) {
-                currentSongRow.classList.add("furatic-owned-song");
-            }
+            const currentKey = getQueueKey(currentSongRow);
+            const isOwnedCurrent = currentKey !== null && ownCurrentSongKey !== null && currentKey === ownCurrentSongKey;
+            currentSongRow.classList.toggle("furatic-owned-song", isOwnedCurrent);
+            currentSongRow.classList.remove("is-removing");
         }
-
-        getQueueRows().forEach(function (row) {
-            const rowSignature = makeElementSignature(row);
-            if (claims.some(function (claim) { return signaturesMatch(claim, rowSignature); })) {
-                row.classList.add("furatic-owned-song");
-            }
-        });
     }
 
-    function reconcileClaims() {
-        let claims = pruneClaims(readStorage(OWNED_CLAIMS_KEY));
-        if (!claims.length) {
+    function refreshOwnSongState() {
+        const ownSongStateUrl = urls["musiq"] && urls["musiq"]["own-song-state"];
+        if (!ownSongStateUrl) {
             return;
         }
 
-        const queueRows = getQueueRows();
-        const currentSongRow = getCurrentSongRow();
-        let changed = false;
+        $.get(ownSongStateUrl)
+            .done(function (response) {
+                ownQueueKeys.clear();
+                if (Array.isArray(response.songs)) {
+                    response.songs.forEach(function (song) {
+                        const key = Number(song.queueKey);
+                        if (Number.isFinite(key) && key > 0) {
+                            ownQueueKeys.add(key);
+                        }
+                    });
+                }
 
-        claims = claims.filter(function (claim) {
-            const inQueue = queueRows.some(function (row) {
-                return signaturesMatch(claim, makeElementSignature(row));
+                const nextCurrent = Number(response.currentSongQueueKey);
+                ownCurrentSongKey = Number.isFinite(nextCurrent) && nextCurrent > 0 ? nextCurrent : null;
+
+                Array.from(pendingRemovals).forEach(function (key) {
+                    if (!ownQueueKeys.has(key)) {
+                        pendingRemovals.delete(key);
+                    }
+                });
+
+                scheduleDecorate();
             });
+    }
 
-            const inCurrent = currentSongRow
-                ? signaturesMatch(claim, makeElementSignature(currentSongRow))
-                : false;
-
-            if (inQueue) {
-                claim.lastSeenAt = now();
-                return true;
-            }
-
-            if (inCurrent) {
-                claim.seenCurrent = true;
-                claim.lastSeenAt = now();
-                changed = true;
-                return true;
-            }
-
-            if (claim.seenCurrent) {
-                claim.retiredAt = now();
-                changed = true;
-                return false;
-            }
-
-            return true;
+    function scheduleRefreshBurst() {
+        OWN_SONG_REFRESH_BURST.forEach(function (delay) {
+            window.setTimeout(refreshOwnSongState, delay);
         });
-
-        if (changed) {
-            writeStorage(OWNED_CLAIMS_KEY, pruneClaims(claims));
-        }
-    }
-
-    function scanOwnedSongs() {
-        scanScheduled = false;
-
-        const queueRows = getQueueRows();
-        const newRows = getNewRowsSinceLastSnapshot(queueRows);
-
-        if (newRows.length) {
-            claimNewRows(newRows);
-        }
-
-        previousQueueSnapshot = queueRows.map(function (row) {
-            return makeElementSignature(row).fingerprint;
-        });
-
-        reconcileClaims();
-        applyOwnedHighlights();
-    }
-
-    function scheduleOwnedSongScan() {
-        if (scanScheduled) {
-            return;
-        }
-
-        scanScheduled = true;
-        window.requestAnimationFrame(scanOwnedSongs);
-    }
-
-    function rememberCurrentInput() {
-        const input = document.getElementById("music-input");
-        if (!input) {
-            return;
-        }
-
-        const value = input.value;
-        if (value && value.trim()) {
-            queuePendingSubmission(value);
-        }
     }
 
     document.addEventListener("pointerdown", function (event) {
@@ -898,8 +802,7 @@
         if (!submitButton) {
             return;
         }
-
-        rememberCurrentInput();
+        scheduleRefreshBurst();
     }, { passive: true });
 
     document.addEventListener("keydown", function (event) {
@@ -912,12 +815,56 @@
             return;
         }
 
-        rememberCurrentInput();
+        scheduleRefreshBurst();
     });
 
     document.addEventListener("click", function (event) {
-        const button = event.target.closest(".vote-up, .vote-down");
+        const removeButton = event.target.closest(".own-song-remove");
+        if (removeButton) {
+            event.preventDefault();
+            event.stopPropagation();
 
+            const row = removeButton.closest("#song-queue > li, #song-queue > .list-group-item");
+            const key = Number(removeButton.getAttribute("data-queue-key") || (row && row.getAttribute("data-queue-key")) || 0);
+            const removeOwnSongUrl = urls["musiq"] && urls["musiq"]["remove-own-song"];
+
+            if (!Number.isFinite(key) || key <= 0 || !removeOwnSongUrl || pendingRemovals.has(key)) {
+                return;
+            }
+
+            pendingRemovals.add(key);
+            if (row) {
+                row.classList.add("is-removing");
+            }
+            scheduleDecorate();
+
+            $.post(removeOwnSongUrl, { key: key })
+                .done(function () {
+                    if (row) {
+                        row.classList.add("furatic-self-remove-fade");
+                    }
+
+                    window.setTimeout(function () {
+                        pendingRemovals.delete(key);
+                        ownQueueKeys.delete(key);
+                        scheduleDecorate();
+                        refreshOwnSongState();
+                    }, prefersReducedMotion ? 40 : 220);
+                })
+                .fail(function (response) {
+                    pendingRemovals.delete(key);
+                    if (row) {
+                        row.classList.remove("is-removing");
+                        row.classList.remove("furatic-self-remove-fade");
+                    }
+                    scheduleDecorate();
+                    showInlineError(response.responseText || "Could not remove your song.");
+                });
+
+            return;
+        }
+
+        const button = event.target.closest(".vote-up, .vote-down");
         if (!button || prefersReducedMotion) {
             return;
         }
@@ -932,32 +879,31 @@
     });
 
     const observer = new MutationObserver(function () {
-        scheduleOwnedSongScan();
+        scheduleDecorate();
     });
 
     const songQueue = document.getElementById("song-queue");
-    const currentSongCard = document.getElementById("current-song-card");
+    const currentSongRow = document.getElementById("current-song");
 
     if (songQueue) {
         observer.observe(songQueue, {
             childList: true,
-            subtree: true,
-            characterData: true
+            subtree: false
         });
     }
 
-    if (currentSongCard) {
-        observer.observe(currentSongCard, {
-            childList: true,
-            subtree: true,
-            characterData: true
+    if (currentSongRow) {
+        observer.observe(currentSongRow, {
+            attributes: true,
+            attributeFilter: ["data-queue-key", "class"],
+            childList: false,
+            subtree: false
         });
     }
 
-    previousQueueSnapshot = getCurrentQueueSnapshot();
-    applyOwnedHighlights();
-    reconcileClaims();
-    scheduleOwnedSongScan();
+    refreshOwnSongState();
+    scheduleDecorate();
+    window.setInterval(refreshOwnSongState, OWN_SONG_POLL_MS);
 })();
 </script>
 {% endblock %}
