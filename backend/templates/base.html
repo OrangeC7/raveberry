@@ -35,6 +35,26 @@
 			{% endblock %}
 		</script>
 		<script src="{% static "bundle.js" %}?v={{ static_asset_version }}"></script>
+		<script>
+		  (function() {
+		    function installAutocompleteStub(jq) {
+		      if (!jq || !jq.fn || typeof jq.fn.autocomplete === 'function') {
+		        return;
+		      }
+		      jq.fn.autocomplete = function() {
+		        return this;
+		      };
+		    }
+		
+		    installAutocompleteStub(window.jQuery);
+		    installAutocompleteStub(window.$);
+		
+		    document.addEventListener('DOMContentLoaded', function() {
+		      installAutocompleteStub(window.jQuery);
+		      installAutocompleteStub(window.$);
+		    });
+		  })();
+		</script>
 
 <title>Raveberry</title>
 <link id="favicon" rel="shortcut icon" href="{% static "raveberry.svg" %}"/>
