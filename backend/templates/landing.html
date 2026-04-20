@@ -933,7 +933,6 @@
 
           if (canUseNativeHls()) {
             video.src = hlsUrl;
-            video.load();
             return;
           }
 
@@ -941,8 +940,7 @@
             hlsInstance = new window.Hls({
               enableWorker: true,
               lowLatencyMode: true,
-              backBufferLength: 12,
-              liveSyncDurationCount: 3,
+              backBufferLength: 20,
             });
             hlsInstance.loadSource(hlsUrl);
             hlsInstance.attachMedia(video);
@@ -984,33 +982,6 @@
           return false;
         }
 
-        function refreshToLiveSource() {
-          if (!hasLoadedStream) {
-            return;
-          }
-
-          if (hlsInstance) {
-            if (typeof hlsInstance.stopLoad === "function") {
-              hlsInstance.stopLoad();
-            }
-            if (typeof hlsInstance.startLoad === "function") {
-              hlsInstance.startLoad(-1);
-            }
-            jumpToLiveEdge();
-            return;
-          }
-
-          if (canUseNativeHls()) {
-            const wasMuted = video.muted;
-            video.pause();
-            video.removeAttribute("src");
-            video.load();
-            video.src = hlsUrl;
-            video.muted = wasMuted;
-            video.load();
-          }
-        }
-
         async function tryPlayLive() {
           pendingPlayAttempt = false;
 
@@ -1038,7 +1009,6 @@
 
           pendingPlayAttempt = true;
           ensureStream();
-          refreshToLiveSource();
           jumpToLiveEdge();
 
           void tryPlayLive();
@@ -1052,10 +1022,6 @@
           syncTvToggle(false);
 
           video.pause();
-
-          if (hlsInstance && typeof hlsInstance.stopLoad === "function") {
-            hlsInstance.stopLoad();
-          }
         }
 
         if (!hlsUrl || (!canUseNativeHls() && !canUseHlsJs())) {
@@ -1103,6 +1069,8 @@
           }
         });
       })();
+
+      let redirectingToAfterHours = false;
       
       async function pollMode() {
         try {
