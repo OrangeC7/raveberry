@@ -445,6 +445,7 @@ function applyQueueChange(oldState, newState) {
       if (!newIndices.includes(newIndex)) {
         // song was not present in old indices -> append new song to the end
         const queueEntry = createQueueItem();
+        updateInformation(queueEntry, song);
         queueEntry.css('opacity', '0');
 
         queueEntry.appendTo($('#song-queue'));
