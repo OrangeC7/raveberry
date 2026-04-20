@@ -115,13 +115,21 @@
         text-align: center;
       }
 
-      .brand > img {
+      .brand > img.reveal-stage {
         display: block;
         width: min(100%, 540px);
         max-width: 100%;
         height: auto;
         margin: 0 auto;
         filter:
+          blur(12px)
+          drop-shadow(0 18px 42px rgba(0,0,0,0.28))
+          drop-shadow(0 0 22px rgba(0,142,248,0.12));
+      }
+      
+      body.is-ready .brand > img.reveal-stage {
+        filter:
+          blur(0)
           drop-shadow(0 18px 42px rgba(0,0,0,0.28))
           drop-shadow(0 0 22px rgba(0,142,248,0.12));
       }
@@ -307,7 +315,7 @@
       
       .tv-corner-button {
         position: absolute;
-        right: -40px;
+        right: -46px;
         bottom: 18px;
         z-index: 6;
         opacity: 0;
@@ -342,6 +350,7 @@
         pointer-events: none;
         filter: blur(8px);
         transform: translate3d(-42px, 0, 0) scale(0.96);
+        transition-duration: 380ms, 980ms, 980ms, 180ms, 180ms;
       }
       
       .icon-button:disabled {
