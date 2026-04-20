@@ -1,4 +1,5 @@
-import {localStorageGet, registerSpecificState} from '../base';
+import {registerSpecificState} from '../base';
+import {getStoredVote} from './vote-state';
 import {showPlayButton, showPauseButton} from './buttons';
 import {syncAudioStream} from './audio';
 
@@ -44,8 +45,9 @@ export function updateState(newState) {
     $('#current-song-title').empty();
     $('#current-song-title').append($('<em/>').text('Currently Empty'));
     $('#current-song-title').trigger('change');
-    $('#current-song').removeClass('present');
+    $('#current-song').removeClass('present own-song-current');
     $('#current-song').addClass('empty');
+    $('#current-song').removeAttr('data-queue-key');
 
     $('#song-votes .vote-down').removeClass('pressed');
     $('#song-votes .vote-up').removeClass('pressed');
@@ -69,7 +71,10 @@ export function updateState(newState) {
       $('#current-song-title').trigger('change');
     }
 
-    const previousVote = localStorageGet('vote-' + currentSong.queueKey);
+    $('#current-song').removeClass('empty').addClass('present');
+    $('#current-song').attr('data-queue-key', String(currentSong.queueKey));
+
+    const previousVote = getStoredVote(currentSong.queueKey);
     if (previousVote == '+') {
       $('#song-votes .vote-up').addClass('pressed');
       $('#song-votes .vote-down').removeClass('pressed');
@@ -241,6 +246,10 @@ function createQueueItem() {
   const entryDiv = $('<div/>')
       .addClass('queue-entry')
       .appendTo(li);
+  if (INTERACTIVITY === INTERACTIVITIES.fullVoting ||
+    INTERACTIVITY === INTERACTIVITIES.upvotesOnly) {
+    entryDiv.addClass('queue-voting-layout');
+  }
   const downloadIcon = $('<div/>')
       .addClass('download-icon')
       .addClass('queue-handle')
@@ -270,32 +279,47 @@ function createQueueItem() {
   const controls = $('<span/>')
       .addClass('queue-info-controls')
       .appendTo(info);
+
+  let actionControls = controls;
   if (INTERACTIVITY === INTERACTIVITIES.fullVoting ||
     INTERACTIVITY === INTERACTIVITIES.upvotesOnly) {
+    const voteCluster = $('<span/>')
+        .addClass('queue-vote-cluster')
+        .appendTo(controls);
     $('<i/>')
         .addClass('fas')
         .addClass('fa-chevron-circle-up')
         .addClass('vote-up')
-        .appendTo(controls);
+        .appendTo(voteCluster);
+    $('<span/>')
+        .addClass('queue-vote-count')
+        .text('0')
+        .appendTo(voteCluster);
+    if (INTERACTIVITY === INTERACTIVITIES.fullVoting) {
+      $('<i/>')
+          .addClass('fas')
+          .addClass('fa-chevron-circle-down')
+          .addClass('vote-down')
+          .appendTo(voteCluster);
+    }
+    if (CONTROLS_ENABLED) {
+      actionControls = $('<span/>')
+          .addClass('queue-admin-controls')
+          .appendTo(controls);
+    }
   }
-  if (INTERACTIVITY === INTERACTIVITIES.fullVoting) {
-    $('<i/>')
-        .addClass('fas')
-        .addClass('fa-chevron-circle-down')
-        .addClass('vote-down')
-        .appendTo(controls);
-  }
+
   if (CONTROLS_ENABLED) {
     $('<i/>')
         .addClass('fas')
         .addClass('fa-level-up-alt')
         .addClass('prioritize')
-        .appendTo(controls);
+        .appendTo(actionControls);
     $('<i/>')
         .addClass('fas')
         .addClass('fa-trash-alt')
         .addClass('remove')
-        .appendTo(controls);
+        .appendTo(actionControls);
   }
   return li;
 }
@@ -305,17 +329,27 @@ function createQueueItem() {
  * @param {Object} song the song containing all information
  */
 function updateInformation(entry, song) {
+  entry.attr('data-queue-key', String(song.id));
+
+  const row = entry.find('.queue-entry');
+  row.toggleClass('queue-entry-ready', Boolean(song.internalUrl));
+
   const index = entry.find('.queue-index');
-  if (INTERACTIVITY === INTERACTIVITIES.upvotesOnly ||
-    INTERACTIVITY === INTERACTIVITIES.fullVoting) {
-    index.text(song.votes);
-  } else {
-    index.text(song.index);
+  index.text(song.index);
+
+  const voteCount = entry.find('.queue-vote-count');
+  if (voteCount.length) {
+    voteCount.text(String(song.votes));
   }
+
   const downloadIcon = entry.find('.download-icon');
   if (song.internalUrl) {
     downloadIcon.hide();
-    index.show();
+    if (row.hasClass('queue-voting-layout')) {
+      index.hide();
+    } else {
+      index.show();
+    }
   } else {
     downloadIcon.show();
     index.hide();
@@ -366,7 +400,7 @@ function updateInformation(entry, song) {
  up.removeClass('pressed');
  down.removeClass('pressed');
  
- const previousVote = localStorageGet('vote-' + song.id);
+ const previousVote = getStoredVote(song.id);
  if (previousVote == '+') {
    up.addClass('pressed');
  } else if (previousVote == '-') {
