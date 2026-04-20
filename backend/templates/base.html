@@ -27,7 +27,8 @@
             const COLOR_INDICATION = {% if color_indication %}true{% else %}false{% endif %};
 			const ADMIN = {% if is_admin %}true{% else %}false{% endif %};
 			const CONTROLS_ENABLED = {% if controls_enabled %}true{% else %}false{% endif %};
-			const RUNTIME_INSTANCE_ID = "{{ runtime_instance_id|default:'' }}";
+			window.RUNTIME_INSTANCE_ID = "{{ runtime_instance_id|default:''|escapejs }}";
+			const RUNTIME_INSTANCE_ID = window.RUNTIME_INSTANCE_ID;
             // Popper is only used for dropdowns and tooltips, neither of which is used
             // https://getbootstrap.com/docs/5.0/getting-started/introduction/
 			const Popper = function(){}
