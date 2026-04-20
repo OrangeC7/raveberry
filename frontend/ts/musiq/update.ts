@@ -446,9 +446,14 @@ function applyQueueChange(oldState, newState) {
         // song was not present in old indices -> append new song to the end
         const queueEntry = createQueueItem();
         updateInformation(queueEntry, song);
+        queueEntry.addClass('furatic-queue-item-enter');
         queueEntry.css('opacity', '0');
 
         queueEntry.appendTo($('#song-queue'));
+
+        window.setTimeout(function() {
+          queueEntry.removeClass('furatic-queue-item-enter');
+        }, 820);
 
         // store its target index in our array
         newIndices.push(newIndex);
