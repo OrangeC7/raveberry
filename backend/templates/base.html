@@ -34,8 +34,6 @@
 			{% block js %}
 			{% endblock %}
 		</script>
-		<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-		<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
 		<script src="{% static "bundle.js" %}?v={{ static_asset_version }}"></script>
 		<script>
 		  $(function() {
@@ -96,7 +94,7 @@
 			</div>
 		</div>
 		<script>
-		  $(function() {
+		  document.addEventListener('DOMContentLoaded', function() {
 		    const navigationEntries =
 		      typeof performance.getEntriesByType === 'function'
 		        ? performance.getEntriesByType('navigation')
@@ -107,36 +105,66 @@
 		        : (performance.navigation && performance.navigation.type === 1 ? 'reload' : 'navigate');
 		
 		    if (navigationType === 'reload' && urls['log-refresh']) {
-		      $.post(urls['log-refresh'], {page: window.location.pathname});
+		      fetch(urls['log-refresh'], {
+		        method: 'POST',
+		        credentials: 'same-origin',
+		        headers: {
+		          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+		          'X-CSRFToken': CSRF_TOKEN
+		        },
+		        body: new URLSearchParams({page: window.location.pathname})
+		      }).catch(function() {});
 		    }
 		
 		    if (!urls['musiq'] || !urls['musiq']['own-song-state'] || !urls['musiq']['remove-own-song']) {
 		      return;
 		    }
-		    if (!document.getElementById('song-queue')) {
+		
+		    const songQueueNode = document.getElementById('song-queue');
+		    if (!songQueueNode) {
 		      return;
 		    }
 		
+		    const currentSongNode = document.getElementById('current-song');
 		    let ownSongs = [];
 		    let ownCurrentSongKey = null;
 		    let ownSongDecorateTimer = null;
+		    let toastTimer = null;
+		
+		    function hideAllToasts() {
+		      document.querySelectorAll('.toast').forEach(function(toast) {
+		        toast.style.display = 'none';
+		      });
+		    }
 		
 		    function showOwnSongToast(kind, message) {
-		      const toast = $('#' + kind + '-toast');
-		      $('.toast').stop(true, true).hide();
-		      toast.find('.toast-content').text(message);
-		      toast.stop(true, true).fadeIn();
-		      window.setTimeout(function() {
-		        toast.fadeOut();
+		      hideAllToasts();
+		      const toast = document.getElementById(kind + '-toast');
+		      if (!toast) {
+		        return;
+		      }
+		      const content = toast.querySelector('.toast-content');
+		      if (content) {
+		        content.textContent = message;
+		      }
+		      toast.style.display = 'block';
+		      window.clearTimeout(toastTimer);
+		      toastTimer = window.setTimeout(function() {
+		        toast.style.display = 'none';
 		      }, 2400);
 		    }
 		
 		    function clearOwnSongDecorations() {
-		      $('#song-queue > li')
-		        .removeClass('own-song-queue-entry')
-		        .find('.own-song-remove')
-		        .remove();
-		      $('#current-song').removeClass('own-song-current');
+		      document.querySelectorAll('#song-queue > li').forEach(function(item) {
+		        item.classList.remove('own-song-queue-entry');
+		        item.querySelectorAll('.own-song-remove').forEach(function(button) {
+		          button.remove();
+		        });
+		      });
+		
+		      if (currentSongNode) {
+		        currentSongNode.classList.remove('own-song-current');
+		      }
 		    }
 		
 		    function applyOwnSongDecorations() {
@@ -148,72 +176,105 @@
 		          return;
 		        }
 		
-		        const item = $('#song-queue > li[data-queue-key="' + queueKey + '"]').first();
-		        if (!item.length) {
+		        const item = document.querySelector('#song-queue > li[data-queue-key="' + queueKey + '"]');
+		        if (!item) {
 		          return;
 		        }
 		
-		        item.addClass('own-song-queue-entry');
+		        item.classList.add('own-song-queue-entry');
 		
-		        if (!item.children('.own-song-remove').length) {
-		          $('<button/>')
-		            .attr('type', 'button')
-		            .attr('aria-label', 'Remove your song from the queue')
-		            .attr('title', 'Remove your song')
-		            .addClass('own-song-remove')
-		            .data('key', queueKey)
-		            .text('×')
-		            .appendTo(item);
+		        const existingButton = Array.from(item.children).find(function(child) {
+		          return child.classList && child.classList.contains('own-song-remove');
+		        });
+		
+		        if (!existingButton) {
+		          const button = document.createElement('button');
+		          button.type = 'button';
+		          button.setAttribute('aria-label', 'Remove your song from the queue');
+		          button.setAttribute('title', 'Remove your song');
+		          button.className = 'own-song-remove';
+		          button.dataset.key = String(queueKey);
+		          button.textContent = '×';
+		          item.appendChild(button);
 		        }
 		      });
 		
 		      const currentSongKey = Number(ownCurrentSongKey);
-		      const currentSong = $('#current-song');
-		      if (currentSongKey && currentSong.length && Number(currentSong.attr('data-queue-key')) === currentSongKey) {
-		        currentSong.addClass('own-song-current');
+		      if (
+		        currentSongKey &&
+		        currentSongNode &&
+		        Number(currentSongNode.getAttribute('data-queue-key')) === currentSongKey
+		      ) {
+		        currentSongNode.classList.add('own-song-current');
 		      }
 		    }
 		
 		    function refreshOwnSongState() {
-		      $.get(urls['musiq']['own-song-state'])
-		        .done(function(response) {
+		      fetch(urls['musiq']['own-song-state'], {
+		        credentials: 'same-origin'
+		      })
+		        .then(function(response) {
+		          if (!response.ok) {
+		            throw new Error('Unable to refresh own-song state.');
+		          }
+		          return response.json();
+		        })
+		        .then(function(response) {
 		          ownSongs = Array.isArray(response.songs) ? response.songs : [];
 		          ownCurrentSongKey = response.currentSongQueueKey ? Number(response.currentSongQueueKey) : null;
 		          applyOwnSongDecorations();
-		        });
+		        })
+		        .catch(function() {});
 		    }
 		
-		    $(document).on('click tap', '.own-song-remove', function(event) {
+		    document.addEventListener('click', function(event) {
+		      const button = event.target.closest('.own-song-remove');
+		      if (!button) {
+		        return;
+		      }
+		
 		      event.preventDefault();
 		      event.stopPropagation();
 		
-		      const button = $(this);
-		      const key = button.data('key');
+		      const key = button.dataset.key;
 		      if (!key) {
 		        return;
 		      }
 		
-		      button.prop('disabled', true);
+		      button.disabled = true;
 		
-		      $.post(urls['musiq']['remove-own-song'], {key: key})
-		        .done(function() {
+		      fetch(urls['musiq']['remove-own-song'], {
+		        method: 'POST',
+		        credentials: 'same-origin',
+		        headers: {
+		          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+		          'X-CSRFToken': CSRF_TOKEN
+		        },
+		        body: new URLSearchParams({key: key})
+		      })
+		        .then(function(response) {
+		          if (!response.ok) {
+		            return response.text().then(function(text) {
+		              throw new Error(text || 'Unable to remove your song.');
+		            });
+		          }
 		          refreshOwnSongState();
 		        })
-		        .fail(function(response) {
-		          showOwnSongToast('error', response.responseText || 'Unable to remove your song.');
+		        .catch(function(error) {
+		          showOwnSongToast('error', error.message || 'Unable to remove your song.');
 		        })
-		        .always(function() {
-		          button.prop('disabled', false);
+		        .finally(function() {
+		          button.disabled = false;
 		        });
 		    });
 		
-		    const songQueueNode = document.getElementById('song-queue');
-		    const currentSongNode = document.getElementById('current-song');
 		    const observer = new MutationObserver(function() {
 		      window.clearTimeout(ownSongDecorateTimer);
 		      ownSongDecorateTimer = window.setTimeout(applyOwnSongDecorations, 40);
 		    });
+		
 		    observer.observe(songQueueNode, {childList: true, subtree: true});
+		
 		    if (currentSongNode) {
 		      observer.observe(currentSongNode, {attributes: true, childList: true, subtree: false});
 		    }
