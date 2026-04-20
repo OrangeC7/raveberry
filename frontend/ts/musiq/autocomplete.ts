@@ -11,9 +11,27 @@ import 'jquery-ui/ui/unique-id';
 import 'jquery-ui/ui/widgets/menu';
 import 'jquery-ui/ui/widgets/autocomplete';
 
-/** Add autocomplete handler. */
+/** Add autocomplete handler.
+ */
 export function onReady() {
-  $('.autocomplete').autocomplete({
+  const totalSuggestionCount =
+    Number(YOUTUBE_SUGGESTIONS || 0) +
+    Number(SPOTIFY_SUGGESTIONS || 0) +
+    Number(SOUNDCLOUD_SUGGESTIONS || 0) +
+    Number(JAMENDO_SUGGESTIONS || 0);
+
+  if (totalSuggestionCount <= 0) {
+    return;
+  }
+
+  const jqAny = $ as any;
+  const autocompleteInput: any = $('.autocomplete');
+
+  if (!autocompleteInput.length || !jqAny.fn || typeof jqAny.fn.autocomplete !== 'function') {
+    return;
+  }
+
+  autocompleteInput.autocomplete({
     source: function(request, response) {
       let firstResponse = true;
       let offlineSuggestions = [];
