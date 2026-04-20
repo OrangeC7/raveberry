@@ -731,6 +731,7 @@
 <script>
 (function () {
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const shell = document.querySelector(".furatic-embed-shell");
     const OWN_SONG_POLL_MS = 3500;
     const OWN_SONG_REFRESH_BURST = [260, 900, 1800];
     const ownQueueKeys = new Set();
@@ -738,12 +739,17 @@
 
     let ownCurrentSongKey = null;
     let decorateQueued = false;
+    let errorToastTimer = 0;
 
     try {
         window.localStorage.removeItem("furatic-owned-song-pending-v1");
         window.localStorage.removeItem("furatic-owned-song-claims-v1");
     } catch (_error) {
-        // ignore storage cleanup failures
+        // ignore
+    }
+
+    function targetElement(event) {
+        return event && event.target instanceof Element ? event.target : null;
     }
 
     function getQueueRows() {
@@ -760,19 +766,40 @@
     }
 
     function showInlineError(message) {
-        const text = String(message || "Could not complete that action.");
-        $("#info-toast, #success-toast, #warning-toast").fadeOut();
-        $("#error-toast").find(".toast-content").text(text);
-        $("#error-toast").stop(true, true).fadeIn();
-        window.setTimeout(function () {
-            $("#error-toast").fadeOut();
+        const toast = document.getElementById("error-toast");
+        const content = toast ? toast.querySelector(".toast-content") : null;
+        if (content) {
+            content.textContent = String(message || "Could not complete that action.");
+        }
+        if (!toast) {
+            return;
+        }
+
+        toast.style.display = "block";
+        toast.classList.add("show");
+
+        window.clearTimeout(errorToastTimer);
+        errorToastTimer = window.setTimeout(function () {
+            toast.classList.remove("show");
+            toast.style.display = "";
         }, 2200);
+    }
+
+    function scheduleIntroCompletion() {
+        if (!shell || shell.classList.contains("furatic-intro-complete")) {
+            return;
+        }
+
+        window.setTimeout(function () {
+            shell.classList.add("furatic-intro-complete");
+        }, prefersReducedMotion ? 0 : 1950);
     }
 
     function scheduleDecorate() {
         if (decorateQueued) {
             return;
         }
+
         decorateQueued = true;
         window.requestAnimationFrame(function () {
             decorateQueued = false;
@@ -780,83 +807,106 @@
         });
     }
 
+    function ensureRemoveButton(row, key) {
+        let button = row.querySelector(".own-song-remove");
+        if (!button) {
+            button = document.createElement("button");
+            button.type = "button";
+            button.className = "own-song-remove";
+            button.setAttribute("aria-label", "Remove your song from the queue");
+            button.setAttribute("title", "Remove your song from the queue");
+            button.innerHTML = '<i class="fas fa-times" aria-hidden="true"></i>';
+            row.appendChild(button);
+
+            if (prefersReducedMotion) {
+                button.classList.add("is-visible");
+            } else {
+                window.requestAnimationFrame(function () {
+                    button.classList.add("is-visible");
+                });
+            }
+        }
+
+        button.setAttribute("data-queue-key", String(key));
+        button.disabled = pendingRemovals.has(key);
+        return button;
+    }
+
     function applyOwnSongDecorations() {
         getQueueRows().forEach(function (row) {
             const key = getQueueKey(row);
             const isOwned = key !== null && ownQueueKeys.has(key);
+
             row.classList.toggle("furatic-owned-song", isOwned);
             row.classList.toggle("is-removing", key !== null && pendingRemovals.has(key));
 
-            let button = row.querySelector(".own-song-remove");
+            const existingButton = row.querySelector(".own-song-remove");
+
             if (!isOwned) {
-                if (button) {
-                    button.remove();
+                if (existingButton) {
+                    existingButton.remove();
                 }
                 return;
             }
 
-            if (!button) {
-                button = document.createElement("button");
-                button.type = "button";
-                button.className = "own-song-remove";
-                button.setAttribute("aria-label", "Remove your song from the queue");
-                button.setAttribute("title", "Remove your song from the queue");
-                button.innerHTML = '<i class="fas fa-times" aria-hidden="true"></i>';
-                row.appendChild(button);
-
-                if (prefersReducedMotion) {
-                    button.classList.add("is-visible");
-                } else {
-                    window.requestAnimationFrame(function () {
-                        button.classList.add("is-visible");
-                    });
-                }
-            }
-
             if (key !== null) {
-                button.setAttribute("data-queue-key", String(key));
-                button.disabled = pendingRemovals.has(key);
+                ensureRemoveButton(row, key);
             }
         });
 
         const currentSongRow = getCurrentSongRow();
         if (currentSongRow) {
             const currentKey = getQueueKey(currentSongRow);
-            const isOwnedCurrent = currentKey !== null && ownCurrentSongKey !== null && currentKey === ownCurrentSongKey;
+            const isOwnedCurrent = currentKey !== null &&
+                ownCurrentSongKey !== null &&
+                currentKey === ownCurrentSongKey;
+
             currentSongRow.classList.toggle("furatic-owned-song", isOwnedCurrent);
             currentSongRow.classList.remove("is-removing");
         }
     }
 
-    function refreshOwnSongState() {
+    async function refreshOwnSongState() {
         const ownSongStateUrl = urls["musiq"] && urls["musiq"]["own-song-state"];
         if (!ownSongStateUrl) {
             return;
         }
 
-        $.get(ownSongStateUrl)
-            .done(function (response) {
-                ownQueueKeys.clear();
-                if (Array.isArray(response.songs)) {
-                    response.songs.forEach(function (song) {
-                        const key = Number(song.queueKey);
-                        if (Number.isFinite(key) && key > 0) {
-                            ownQueueKeys.add(key);
-                        }
-                    });
-                }
+        try {
+            const response = await fetch(ownSongStateUrl, {
+                credentials: "same-origin",
+                cache: "no-store"
+            });
 
-                const nextCurrent = Number(response.currentSongQueueKey);
-                ownCurrentSongKey = Number.isFinite(nextCurrent) && nextCurrent > 0 ? nextCurrent : null;
+            if (!response.ok) {
+                return;
+            }
 
-                Array.from(pendingRemovals).forEach(function (key) {
-                    if (!ownQueueKeys.has(key)) {
-                        pendingRemovals.delete(key);
+            const data = await response.json();
+
+            ownQueueKeys.clear();
+            if (Array.isArray(data.songs)) {
+                data.songs.forEach(function (song) {
+                    const key = Number(song.queueKey);
+                    if (Number.isFinite(key) && key > 0) {
+                        ownQueueKeys.add(key);
                     }
                 });
+            }
 
-                scheduleDecorate();
+            const nextCurrent = Number(data.currentSongQueueKey);
+            ownCurrentSongKey = Number.isFinite(nextCurrent) && nextCurrent > 0 ? nextCurrent : null;
+
+            Array.from(pendingRemovals).forEach(function (key) {
+                if (!ownQueueKeys.has(key)) {
+                    pendingRemovals.delete(key);
+                }
             });
+
+            scheduleDecorate();
+        } catch (_error) {
+            // silent retry on next poll
+        }
     }
 
     function scheduleRefreshBurst() {
@@ -865,11 +915,66 @@
         });
     }
 
+    async function removeOwnSong(key, row, button) {
+        const removeOwnSongUrl = urls["musiq"] && urls["musiq"]["remove-own-song"];
+        if (!removeOwnSongUrl || pendingRemovals.has(key)) {
+            return;
+        }
+
+        pendingRemovals.add(key);
+        row.classList.add("is-removing");
+        button.disabled = true;
+        scheduleDecorate();
+
+        try {
+            const form = new URLSearchParams();
+            form.set("key", String(key));
+            form.set("csrfmiddlewaretoken", CSRF_TOKEN);
+
+            const response = await fetch(removeOwnSongUrl, {
+                method: "POST",
+                credentials: "same-origin",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                    "X-CSRFToken": CSRF_TOKEN
+                },
+                body: form.toString()
+            });
+
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(text || "Could not remove your song.");
+            }
+
+            row.classList.add("furatic-self-remove-fade");
+
+            window.setTimeout(function () {
+                pendingRemovals.delete(key);
+                ownQueueKeys.delete(key);
+                scheduleDecorate();
+                refreshOwnSongState();
+            }, prefersReducedMotion ? 40 : 220);
+        } catch (error) {
+            pendingRemovals.delete(key);
+            row.classList.remove("is-removing");
+            row.classList.remove("furatic-self-remove-fade");
+            button.disabled = false;
+            scheduleDecorate();
+            showInlineError(error && error.message ? error.message : "Could not remove your song.");
+        }
+    }
+
     document.addEventListener("pointerdown", function (event) {
-        const submitButton = event.target.closest("#request-button-container, #request-new-music, #request-archived-music");
+        const target = targetElement(event);
+        if (!target) {
+            return;
+        }
+
+        const submitButton = target.closest("#request-button-container, #request-new-music, #request-archived-music");
         if (!submitButton) {
             return;
         }
+
         scheduleRefreshBurst();
     }, { passive: true });
 
@@ -878,8 +983,8 @@
             return;
         }
 
-        const input = event.target.closest("#music-input");
-        if (!input) {
+        const target = targetElement(event);
+        if (!target || !target.closest("#music-input")) {
             return;
         }
 
@@ -887,52 +992,26 @@
     });
 
     document.addEventListener("click", function (event) {
-        const removeButton = event.target.closest(".own-song-remove");
+        const target = targetElement(event);
+        if (!target) {
+            return;
+        }
+
+        const removeButton = target.closest(".own-song-remove");
         if (removeButton) {
             event.preventDefault();
             event.stopPropagation();
 
             const row = removeButton.closest("#song-queue > li, #song-queue > .list-group-item");
             const key = Number(removeButton.getAttribute("data-queue-key") || (row && row.getAttribute("data-queue-key")) || 0);
-            const removeOwnSongUrl = urls["musiq"] && urls["musiq"]["remove-own-song"];
 
-            if (!Number.isFinite(key) || key <= 0 || !removeOwnSongUrl || pendingRemovals.has(key)) {
-                return;
+            if (row && Number.isFinite(key) && key > 0) {
+                removeOwnSong(key, row, removeButton);
             }
-
-            pendingRemovals.add(key);
-            if (row) {
-                row.classList.add("is-removing");
-            }
-            scheduleDecorate();
-
-            $.post(removeOwnSongUrl, { key: key })
-                .done(function () {
-                    if (row) {
-                        row.classList.add("furatic-self-remove-fade");
-                    }
-
-                    window.setTimeout(function () {
-                        pendingRemovals.delete(key);
-                        ownQueueKeys.delete(key);
-                        scheduleDecorate();
-                        refreshOwnSongState();
-                    }, prefersReducedMotion ? 40 : 220);
-                })
-                .fail(function (response) {
-                    pendingRemovals.delete(key);
-                    if (row) {
-                        row.classList.remove("is-removing");
-                        row.classList.remove("furatic-self-remove-fade");
-                    }
-                    scheduleDecorate();
-                    showInlineError(response.responseText || "Could not remove your song.");
-                });
-
             return;
         }
 
-        const button = event.target.closest(".vote-up, .vote-down");
+        const button = target.closest(".vote-up, .vote-down");
         if (!button || prefersReducedMotion) {
             return;
         }
@@ -969,9 +1048,9 @@
         });
     }
 
+    scheduleIntroCompletion();
     refreshOwnSongState();
     scheduleDecorate();
     window.setInterval(refreshOwnSongState, OWN_SONG_POLL_MS);
 })();
 </script>
-{% endblock %}
