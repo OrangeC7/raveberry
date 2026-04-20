@@ -915,6 +915,7 @@
         let hlsInstance = null;
         let hasLoadedStream = false;
         let pendingPlayAttempt = false;
+        let hasOpenedTvOnce = false;
 
         function canUseNativeHls() {
           return video.canPlayType("application/vnd.apple.mpegurl");
@@ -998,14 +999,20 @@
         }
 
         function openTv() {
+          const shouldJumpToLive = hasOpenedTvOnce;
+
           playerLayout.classList.add("is-tv-open");
           panel.classList.add("is-open");
           panel.setAttribute("aria-hidden", "false");
           syncTvToggle(true);
 
+          hasOpenedTvOnce = true;
           pendingPlayAttempt = true;
           ensureStream();
-          jumpToLiveEdge();
+
+          if (shouldJumpToLive) {
+            jumpToLiveEdge();
+          }
 
           void tryPlayLive();
         }
@@ -1042,26 +1049,14 @@
         });
 
         video.addEventListener("loadedmetadata", function () {
-          if (panel.classList.contains("is-open")) {
-            jumpToLiveEdge();
-            if (pendingPlayAttempt) {
-              void tryPlayLive();
-            }
+          if (panel.classList.contains("is-open") && pendingPlayAttempt) {
+            void tryPlayLive();
           }
         });
 
         video.addEventListener("canplay", function () {
-          if (panel.classList.contains("is-open")) {
-            jumpToLiveEdge();
-            if (pendingPlayAttempt) {
-              void tryPlayLive();
-            }
-          }
-        });
-
-        video.addEventListener("playing", function () {
-          if (panel.classList.contains("is-open")) {
-            jumpToLiveEdge();
+          if (panel.classList.contains("is-open") && pendingPlayAttempt) {
+            void tryPlayLive();
           }
         });
       })();
