@@ -983,21 +983,17 @@
         }
 
         async function tryPlayLive() {
-          pendingPlayAttempt = false;
+          if (!panel.classList.contains("is-open")) {
+            return false;
+          }
 
           try {
             video.muted = false;
             await video.play();
-            return;
+            pendingPlayAttempt = false;
+            return true;
           } catch (_error) {
-            // browser blocked autoplay with sound
-          }
-
-          try {
-            video.muted = true;
-            await video.play();
-          } catch (_error) {
-            // give up silently
+            return false;
           }
         }
 
