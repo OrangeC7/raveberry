@@ -10,6 +10,8 @@ export function onReady() {
   let currentTokens = maxTokens;
   const bucketLifetime = 30000; // half a minute
   let currentBucket = $.now();
+  const activationEvents = window.PointerEvent ? 'pointerup' : 'touchend click';
+  let lastTouchActivation = 0;
 
   /** Makes sure that voting does not occur too often.
    * @return {boolean} whether voting is allowed. */
@@ -42,8 +44,9 @@ export function onReady() {
   /** Vote for a song.
    * @param {HTMLElement} button the button that was pressed to vote
    * @param {number} key the key of the voted song
-   * @param {number} amount the amount of votes, from -2 to +2. */
-  function vote(button, key, amount) {
+   * @param {number} amount the amount of votes, from -2 to +2.
+   * @param {?Function} onFail callback to restore the previous UI state. */
+  function vote(button, key, amount, onFail = null) {
     let votes = button.closest('.queue-entry').find('.queue-vote-count');
     if (votes.length == 0) {
       votes = button.siblings('#current-song-votes');
@@ -54,75 +57,108 @@ export function onReady() {
       key: key,
       amount: amount,
     }).fail(function(response) {
-      errorToast(response.responseText);
+      errorToast(response.responseText || 'Could not register vote');
       const failedVotes = Number(votes.text()) || 0;
       votes.text(String(failedVotes - amount));
+      if (onFail) {
+        onFail();
+      }
     });
   }
 
-  $('#content').on('click tap', '.vote-up', function() {
+  function shouldIgnoreActivation(event: any) {
+    const originalEvent = event.originalEvent || event;
+    if (event.type === 'pointerup') {
+      if (originalEvent && originalEvent.pointerType === 'mouse' && originalEvent.button !== 0) {
+        return true;
+      }
+      if (originalEvent && originalEvent.pointerType && originalEvent.pointerType !== 'mouse') {
+        event.preventDefault();
+      }
+      return false;
+    }
+    if (event.type === 'touchend') {
+      lastTouchActivation = Date.now();
+      event.preventDefault();
+      return false;
+    }
+    if (event.type === 'click' && Date.now() - lastTouchActivation < 450) {
+      return true;
+    }
+    return false;
+  }
+
+  function resolveVoteKey(button) {
+    if (button.closest('#current-song-card').length > 0) {
+      if (state == null || state.currentSong == null) {
+        return -1;
+      }
+      return state.currentSong.queueKey;
+    }
+    return keyOfElement(button);
+  }
+
+  function handleVotePress(buttonElement, direction) {
     if (!canVote()) {
       return;
     }
-    let key = -1;
-    if ($(this).closest('#current-song-card').length > 0) {
-      if (state == null || state.currentSong == null) {
-        return;
-      }
-      key = state.currentSong.queueKey;
-    } else {
-      key = keyOfElement($(this));
-    }
+
+    const button = $(buttonElement);
+    const key = resolveVoteKey(button);
     if (key == -1) {
       return;
     }
-    const other = $(this).siblings('.vote-down');
-    if ($(this).hasClass('pressed')) {
-      $(this).removeClass('pressed');
-      setStoredVote(key, '0');
-      vote($(this), key, -1);
-    } else {
-      $(this).addClass('pressed');
-      if (other.hasClass('pressed')) {
-        other.removeClass('pressed');
-        vote($(this), key, 2);
-      } else {
-        vote($(this), key, 1);
+
+    const up = direction === 'up' ? button : button.siblings('.vote-up');
+    const down = direction === 'down' ? button : button.siblings('.vote-down');
+    const previousState = up.hasClass('pressed') ? '+' : down.hasClass('pressed') ? '-' : '0';
+
+    function applyVisualVoteState(value) {
+      up.removeClass('pressed');
+      down.removeClass('pressed');
+      if (value === '+') {
+        up.addClass('pressed');
+      } else if (value === '-') {
+        down.addClass('pressed');
       }
-      setStoredVote(key, '+');
+      setStoredVote(key, value);
     }
+
+    function restorePreviousState() {
+      applyVisualVoteState(previousState);
+    }
+
+    if (direction === 'up') {
+      if (up.hasClass('pressed')) {
+        applyVisualVoteState('0');
+        vote(button, key, -1, restorePreviousState);
+      } else {
+        applyVisualVoteState('+');
+        vote(button, key, down.hasClass('pressed') ? 2 : 1, restorePreviousState);
+      }
+      return;
+    }
+
+    if (down.hasClass('pressed')) {
+      applyVisualVoteState('0');
+      vote(button, key, 1, restorePreviousState);
+    } else {
+      applyVisualVoteState('-');
+      vote(button, key, up.hasClass('pressed') ? -2 : -1, restorePreviousState);
+    }
+  }
+
+  $('#content').on(activationEvents, '.vote-up', function(event) {
+    if (shouldIgnoreActivation(event)) {
+      return;
+    }
+    handleVotePress(this, 'up');
   });
-  $('#content').on('click tap', '.vote-down', function() {
-    if (!canVote()) {
+  $('#content').on(activationEvents, '.vote-down', function(event) {
+    if (shouldIgnoreActivation(event)) {
       return;
     }
-    let key = -1;
-    if ($(this).closest('#current-song-card').length > 0) {
-      if (state == null || state.currentSong == null) {
-        return;
-      }
-      key = state.currentSong.queueKey;
-    } else {
-      key = keyOfElement($(this));
-    }
-    if (key == -1) {
-      return;
-    }
-    const other = $(this).siblings('.vote-up');
-    if ($(this).hasClass('pressed')) {
-      $(this).removeClass('pressed');
-      setStoredVote(key, '0');
-      vote($(this), key, 1);
-    } else {
-      $(this).addClass('pressed');
-      if (other.hasClass('pressed')) {
-        other.removeClass('pressed');
-        vote($(this), key, -2);
-      } else {
-        vote($(this), key, -1);
-      }
-      setStoredVote(key, '-');
-    }
+    handleVotePress(this, 'down');
   });
 }
 
