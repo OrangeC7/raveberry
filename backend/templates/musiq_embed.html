@@ -599,8 +599,8 @@
     
     .queue-vote-cluster .vote-up,
     .queue-vote-cluster .vote-down {
-        min-width: 3px;
-        min-height: 3px;
+        min-width: 20px;
+        min-height: 20px;
         padding: 4px;
     }
     
@@ -716,7 +716,7 @@
     .furatic-own-vote-tooltip::before {
         content: "";
         position: absolute;
-        left: 50%;
+        left: var(--furatic-tooltip-arrow-left, 50%);
         top: 100%;
         transform: translateX(-50%);
         width: 0;
@@ -729,7 +729,7 @@
     .furatic-own-vote-tooltip::after {
         content: "";
         position: absolute;
-        left: 50%;
+        left: var(--furatic-tooltip-arrow-left, 50%);
         top: 100%;
         transform: translateX(-50%);
         width: 0;
@@ -1078,23 +1078,52 @@
         if (!tooltip || !button) {
             return;
         }
-
+    
         tooltip.classList.add("is-visible");
         tooltip.setAttribute("aria-hidden", "false");
-
+    
         const buttonRect = button.getBoundingClientRect();
         const tooltipRect = tooltip.getBoundingClientRect();
-
+        const isQueueVoteButton = !!button.closest("#song-queue");
+    
         let left = buttonRect.left + (buttonRect.width / 2);
-        const minLeft = 12 + (tooltipRect.width / 2);
-        const maxLeft = window.innerWidth - 12 - (tooltipRect.width / 2);
-
-        if (minLeft <= maxLeft) {
-            left = Math.max(minLeft, Math.min(maxLeft, left));
+        let arrowLeft = "50%";
+    
+        if (isQueueVoteButton) {
+            const viewportPadding = 12;
+            const arrowEdgePadding = 24;
+    
+            const desiredTooltipLeftEdge = Math.max(
+                viewportPadding,
+                Math.min(
+                    window.innerWidth - viewportPadding - tooltipRect.width,
+                    buttonRect.right - tooltipRect.width + 18
+                )
+            );
+    
+            left = desiredTooltipLeftEdge + (tooltipRect.width / 2);
+    
+            const arrowOffsetPx = Math.max(
+                arrowEdgePadding,
+                Math.min(
+                    tooltipRect.width - arrowEdgePadding,
+                    (buttonRect.left + (buttonRect.width / 2)) - desiredTooltipLeftEdge
+                )
+            );
+    
+            arrowLeft = arrowOffsetPx.toFixed(2) + "px";
+        } else {
+            const minLeft = 12 + (tooltipRect.width / 2);
+            const maxLeft = window.innerWidth - 12 - (tooltipRect.width / 2);
+    
+            if (minLeft <= maxLeft) {
+                left = Math.max(minLeft, Math.min(maxLeft, left));
+            }
         }
-
+    
         const top = Math.max(tooltipRect.height + 18, buttonRect.top);
-
+    
+        tooltip.style.setProperty("--furatic-tooltip-arrow-left", arrowLeft);
         tooltip.style.left = left.toFixed(2) + "px";
         tooltip.style.top = top.toFixed(2) + "px";
     }
