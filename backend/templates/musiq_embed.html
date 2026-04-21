@@ -270,7 +270,7 @@
     }
     
     .list-group-item.furatic-owned-song .queue-entry {
-        padding-left: 36px;
+        padding-left: 42px;
         box-sizing: border-box;
     }
     
@@ -679,19 +679,19 @@
         border-radius: 18px;
         border: 1px solid rgba(255,255,255,0.18);
         background:
-            linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.08)),
-            rgba(255,255,255,0.06);
+            linear-gradient(180deg, rgba(0,0,0,0.7), rgba(0,0,0,0.7)),
+            rgba(0,0,0,0.7);
         color: #f6fbff;
         box-shadow:
             0 18px 44px rgba(0, 0, 0, 0.22),
             0 0 24px rgba(86, 220, 255, 0.08),
             inset 0 1px 0 rgba(255,255,255,0.12);
-        -webkit-backdrop-filter: blur(30px) saturate(160%) brightness(1.06);
-        backdrop-filter: blur(30px) saturate(160%) brightness(0.5);
+        -webkit-backdrop-filter: blur(7px) saturate(160%) brightness(0.5);
+        backdrop-filter: blur(7px) saturate(160%) brightness(0.5);
         pointer-events: none;
         opacity: 0;
         visibility: hidden;
-        filter: blur(30px);
+        filter: blur(7px);
         transform: translate3d(-50%, calc(-100% - 12px), 0) scale(0.94);
         transform-origin: bottom center;
         transition:
@@ -743,8 +743,8 @@
         display: flex;
         align-items: stretch;
         gap: 10px;
-        font-size: 0.94rem;
-        font-weight: 600;
+        font-size: 1.2rem;
+        font-weight: 800;
         line-height: 1.22;
         letter-spacing: 0.01em;
         text-wrap: pretty;
@@ -874,7 +874,7 @@
     >
         <span class="furatic-own-vote-tooltip__message">
             <span class="furatic-own-vote-tooltip__text">
-                You can't change the vote for your own song because every song starts with 1 vote.
+                To make it fair, every song starts with 1 vote.
             </span>
             <span class="furatic-own-vote-tooltip__emoji-wrap" aria-hidden="true">
                 <img
