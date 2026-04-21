@@ -133,9 +133,41 @@ class Youtube:
 class YoutubeSongProvider(SongProvider, Youtube):
     """This class handles songs from Youtube."""
 
+    MAX_DURATION_SECONDS = 10 * 60
+
+    @staticmethod
+    def _normalize_host(url: str) -> str:
+        host = urlparse(url).netloc.lower().split(":", 1)[0]
+        if host.startswith("www."):
+            host = host[4:]
+        return host
+
+    @staticmethod
+    def _is_youtube_host(host: str) -> bool:
+        return (
+            host == "youtu.be"
+            or host == "youtube.com"
+            or host.endswith(".youtube.com")
+            or host.startswith("youtube.")
+        )
+
     @staticmethod
     def get_id_from_external_url(url: str) -> str:
-        return parse_qs(urlparse(url).query)["v"][0]
+        parsed = urlparse(url)
+        host = YoutubeSongProvider._normalize_host(url)
+
+        if host == "youtu.be":
+            video_id = parsed.path.strip("/").split("/", 1)[0]
+            if video_id:
+                return video_id
+            raise KeyError("missing youtube video id")
+
+        if YoutubeSongProvider._is_youtube_host(host):
+            video_ids = parse_qs(parsed.query).get("v")
+            if video_ids and video_ids[0]:
+                return video_ids[0]
+
+        raise KeyError("missing youtube video id")
 
     def __init__(self, query: Optional[str], key: Optional[int]) -> None:
         self.type = "youtube"
@@ -153,6 +185,36 @@ class YoutubeSongProvider(SongProvider, Youtube):
 
     def check_available(self) -> bool:
         self.info_dict = {}
+        self.error = ""
+
+        query = self.query or ""
+
+        if not self.id:
+            parsed_query = urlparse(query)
+            if parsed_query.scheme in {"http", "https"} and parsed_query.netloc:
+                host = self._normalize_host(query)
+
+                if not self._is_youtube_host(host):
+                    self.error = "Please paste a valid YouTube link."
+                    return False
+
+                try:
+                    self.id = self.get_id_from_external_url(query)
+                except KeyError:
+                    self.error = "Please paste a valid YouTube video link."
+                    return False
+
+        def is_age_restricted(error: Exception) -> bool:
+            message = str(error).lower()
+            return (
+                "age-restricted" in message
+                or "confirm your age" in message
+                or "sign in to confirm your age" in message
+            )
+
+        def is_too_long(info: Dict[str, Any]) -> bool:
+            duration = info.get("duration")
+            return duration is not None and duration > self.MAX_DURATION_SECONDS
 
         def extract_info(video_id: str) -> bool:
             try:
@@ -162,32 +224,47 @@ class YoutubeSongProvider(SongProvider, Youtube):
             except (yt_dlp.utils.ExtractorError, yt_dlp.utils.DownloadError) as error:
                 logging.warning("error during availability check for %s:", video_id)
                 logging.warning(error)
+                if is_age_restricted(error):
+                    self.error = "Sorry, this video is age-restricted."
                 return False
 
         if self.id:
             # do not search if an id is already present
-            extract_info(self.id)
+            if not extract_info(self.id):
+                if not self.error:
+                    self.error = "Sorry, this video could not be played."
+                return False
+
+            if is_too_long(self.info_dict):
+                self.error = "Sorry, videos over 10 minutes are not allowed."
+                return False
         else:
             # do not filter to only receive "song" results, because we would skip the top result
             try:
-                results = ytmusicapi.YTMusic().search(self.query)
+                results = ytmusicapi.YTMusic().search(query)
             except Exception as error:
-                logging.warning("ytmusic search failed for %r: %s", self.query, error)
+                logging.warning("ytmusic search failed for %r: %s", query, error)
                 try:
                     with yt_dlp.YoutubeDL(Youtube.get_ydl_opts()) as ydl:
                         search_result = ydl.extract_info(
-                            f"ytsearch1:{self.query}",
+                            f"ytsearch1:{query}",
                             download=False,
                         ) or {}
                     entries = search_result.get("entries") or []
-                    if entries:
-                        self.info_dict = entries[0]
+                    for entry in entries:
+                        duration = entry.get("duration")
+                        if duration is not None and duration > self.MAX_DURATION_SECONDS:
+                            continue
+                        self.info_dict = entry
+                        break
                 except (yt_dlp.utils.ExtractorError, yt_dlp.utils.DownloadError) as fallback_error:
                     logging.warning(
                         "yt-dlp fallback search failed for %r: %s",
-                        self.query,
+                        query,
                         fallback_error,
                     )
+                    if is_age_restricted(fallback_error):
+                        self.error = "Sorry, this video is age-restricted."
                     self.info_dict = {}
             else:
                 for result in results:
@@ -195,11 +272,16 @@ class YoutubeSongProvider(SongProvider, Youtube):
                         continue
                     if song_utils.is_forbidden(result["title"]):
                         continue
-                    if extract_info(result["videoId"]):
-                        break
+                    if not extract_info(result["videoId"]):
+                        continue
+                    if is_too_long(self.info_dict):
+                        self.info_dict = {}
+                        continue
+                    break
 
         if not self.info_dict:
-            self.error = "No songs found"
+            if not self.error:
+                self.error = "Sorry, no playable song was found."
             return False
 
         self.id = self.info_dict["id"]
@@ -236,6 +318,15 @@ class YoutubeSongProvider(SongProvider, Youtube):
 
         except yt_dlp.utils.DownloadError as error:
             download_error = error
+            message = str(error).lower()
+            if (
+                "age-restricted" in message
+                or "confirm your age" in message
+                or "sign in to confirm your age" in message
+            ):
+                self.error = "Sorry, this video is age-restricted."
+            else:
+                self.error = "Sorry, this video could not be downloaded."
 
         if download_error is not None or location is None:
             logging.error("accessible video could not be downloaded: %s", self.id)
