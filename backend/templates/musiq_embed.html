@@ -673,19 +673,21 @@
         left: 0;
         top: 0;
         z-index: 9999;
-        max-width: min(340px, calc(100vw - 24px));
+        min-width: min(520px, calc(100vw - 24px));
+        max-width: min(560px, calc(100vw - 24px));
         padding: 10px 14px;
         border-radius: 18px;
-        border: 1px solid rgba(255,255,255,0.12);
+        border: 1px solid rgba(255,255,255,0.18);
         background:
-            linear-gradient(180deg, rgba(16, 22, 40, 0.94), rgba(9, 13, 26, 0.92));
+            linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.08)),
+            rgba(255,255,255,0.06);
         color: #f6fbff;
         box-shadow:
-            0 18px 44px rgba(0, 0, 0, 0.30),
+            0 18px 44px rgba(0, 0, 0, 0.22),
             0 0 24px rgba(86, 220, 255, 0.08),
-            inset 0 1px 0 rgba(255,255,255,0.06);
-        -webkit-backdrop-filter: blur(22px) saturate(128%);
-        backdrop-filter: blur(22px) saturate(128%);
+            inset 0 1px 0 rgba(255,255,255,0.12);
+        -webkit-backdrop-filter: blur(30px) saturate(160%) brightness(1.06);
+        backdrop-filter: blur(30px) saturate(160%) brightness(1.06);
         pointer-events: none;
         opacity: 0;
         visibility: hidden;
@@ -734,7 +736,7 @@
         height: 0;
         border-left: 9px solid transparent;
         border-right: 9px solid transparent;
-        border-top: 10px solid rgba(10, 14, 28, 0.96);
+        border-top: 10px solid rgba(255,255,255,0.10);
     }
     
     .furatic-own-vote-tooltip__message {
