@@ -663,6 +663,95 @@
         }
     }
 
+    .vote-up[data-furatic-own-vote-blocked="true"],
+    .vote-down[data-furatic-own-vote-blocked="true"] {
+        cursor: not-allowed;
+    }
+    
+    .furatic-own-vote-tooltip {
+        position: fixed;
+        left: 0;
+        top: 0;
+        z-index: 9999;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        max-width: min(310px, calc(100vw - 24px));
+        padding: 10px 14px;
+        border-radius: 16px;
+        border: 1px solid rgba(255,255,255,0.12);
+        background:
+            linear-gradient(180deg, rgba(16, 22, 40, 0.94), rgba(9, 13, 26, 0.92));
+        color: #f6fbff;
+        box-shadow:
+            0 18px 44px rgba(0, 0, 0, 0.30),
+            0 0 24px rgba(86, 220, 255, 0.08),
+            inset 0 1px 0 rgba(255,255,255,0.06);
+        -webkit-backdrop-filter: blur(22px) saturate(128%);
+        backdrop-filter: blur(22px) saturate(128%);
+        pointer-events: none;
+        opacity: 0;
+        visibility: hidden;
+        filter: blur(10px);
+        transform: translate3d(-50%, calc(-100% - 14px), 0) scale(0.94);
+        transform-origin: bottom center;
+        transition:
+            opacity 180ms ease,
+            transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
+            filter 240ms ease,
+            visibility 0s linear 280ms;
+    }
+    
+    .furatic-own-vote-tooltip.is-visible {
+        opacity: 1;
+        visibility: visible;
+        filter: blur(0);
+        transform: translate3d(-50%, calc(-100% - 14px), 0) scale(1);
+        transition:
+            opacity 180ms ease,
+            transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
+            filter 240ms ease,
+            visibility 0s;
+    }
+    
+    .furatic-own-vote-tooltip::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: calc(100% - 1px);
+        width: 12px;
+        height: 12px;
+        background: rgba(10, 14, 28, 0.96);
+        border-right: 1px solid rgba(255,255,255,0.10);
+        border-bottom: 1px solid rgba(255,255,255,0.10);
+        transform: translateX(-50%) rotate(45deg);
+        box-sizing: border-box;
+    }
+    
+    .furatic-own-vote-tooltip__emoji {
+        width: 18px;
+        height: 18px;
+        flex: 0 0 18px;
+        display: block;
+        object-fit: contain;
+    }
+    
+    .furatic-own-vote-tooltip__text {
+        font-weight: 600;
+        line-height: 1.38;
+        letter-spacing: 0.01em;
+        text-wrap: pretty;
+    }
+    
+    @media (prefers-reduced-motion: reduce) {
+        .furatic-own-vote-tooltip,
+        .furatic-own-vote-tooltip.is-visible {
+            transition: opacity 120ms ease;
+            transform: translate3d(-50%, calc(-100% - 14px), 0) scale(1);
+            filter: none;
+        }
+    }
+    
     .modal-content {
         background: var(--furatic-panel-strong) !important;
         border-radius: 18px !important;
@@ -738,6 +827,23 @@
             </div>
         </div>
     </div>
+
+    <div
+        class="furatic-own-vote-tooltip"
+        id="own-vote-tooltip"
+        role="tooltip"
+        aria-hidden="true"
+    >
+        <span class="furatic-own-vote-tooltip__text">You can't vote for your own song.</span>
+        <img
+            class="furatic-own-vote-tooltip__emoji"
+            src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAACXBIWXMAAB7CAAAewgFu0HU+AAAIeUlEQVR4Xu1cSXIsNRBtA3u+uYAdAXs4AFwF9mwYDsKwYQ9H+FeAA8CCHUTYF8DmAIRpVbeqs1QpKTWkhvbrCEfYbimlfO9lKqUaDgd8gAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAIFrQODmGpw4+vDi+HEtfqnTcw1AueRT0K7BP1URvKNqXd94iHz90a9ghNkjRCqA2f1Uk9rMwEjJd8GT+vwq6gopGGoKzDC8I/6bz/8Jmvn+lw+4732+v6qaYhQBSKNt0y5GPMe6IwbX/439l5fTnzc3a7NR8MqIG77LCEUgF3HS/yUD4YjGjGPHWsc0xFvykweYrENvAYRApyJYfr+7u1vhzYl+25npu5mHbXd/f38wP9f86S2ABVsabU7k0QhN5uG7n28P5kf6oWNT4onwcgtP6RSat+spgAVMLtVy/6PR76IkJZkKws0CPvKbM9J4wJ5FjVcAFgNbfFnyHx8fl68oeZT8b794CsJn27rtbGFoRWCj/+HhYbFn/rZjH//siVl1ebxX3aLMYJR8mZnDwZBpiI2Rb+x99PVvJ7OBVYFb86+VfANFLwFs+KWg26ijDQwBoSXAJf/t7Z9r979++HT5fSX//I3v/7YjNw+pKGdq17MGWNMrBYyKga7LJApZfA3pqUWfFcWHX/262CT7/Zk4LJprjwzApn+63tI12IggRAyNdg4JN/JtG9//i9CcsHMPAQRhMkKI7b19pIPUdAX2qGjXDOBW29xSYDMDzQI2Zae7u+/x94+fpZrpgVnqHMXth8sA7syXLdjvf4gd4hpmkBwajzsMmlYUrSe+Wf9DGcAwYL9fBXD7ZiUmlAVSCA/tLuxgsQLUUUtrTIuCY/gMYLy7++TjaBYIkS4hOYRirL8jECPyaUTQRQA3z/8ueF8u7fDw7wrCp+fjIc4lC/hIjxFWFDJMZzNeYpaoPYVse10EkD1b0tEln5KQQ0aOaDzjTBP9Bs7Wkz0VUCaSzx+T3s3Hd/K2qwNMY5IFaogpZsO9FuFp3xrL2LRF30+bAVjviLBE3tNGAVEFMsqUpFO35xRACdE+ZVCb8QwzPfEWhtaOXPbQZ8DtEmAnxC0FtmhMjuraHS7CaI1bbU9Wez0c8dYBnAiyyKcRnJMtfP33maEHflXF0O9qIAHTPemzpGeRXxUeYiy+LGiNrGq3hYL999HlRGcMDo6o1HFiGeSKlgLNDBC/oXOGqJphjrGgCHyvvwvgoo+Can5PjdACh9F1i4C+ADjELeEzRFd4rnZ5a7GUqmhXc+K7al/FA86oK6yUDFMmSk08VeDrkwFUXCk0Wka8HTx2JVD6YEkzIUEAEeKlF4nIcTEnAinxVEjmd3UhaA7Qbwkw0Mm3cmvqcJ9IorehSYTgXDOw2K7kv/vl5SKYL1/999Plcjdpo8aTmuHz5PuLILYLIShzj6SliCB0GVpCPhUFIwQVrlSMUkyX31OKsMKlPNg9ku59j4S7t6X7soFPAKnkB4RQna/qBh0C+maA42Re3ry/Tin24EfsnQChbGDJd59jKCHfTtzJBlU5q2rME33NRUBJd+cUEkFMAEtVdnlbyGLavVnEfatIDQEwQqjGW7tdgPKJX4h0KgLfk0YS8o0dl2Ca9mM2PAXeLm4EooltN8ULaTUlRUZUyQJS0rm5uZEcI8/nX8hObMnx2QwJgIioCnetMoCZ7MuyNSssCEtIdzOBTem55NOMIAk5QWRLzFRt00oAl0lniKAW6RxyJeRLmRiReDv3lgI4ZQHzEYhAk3Qpca+hneb9AOzSu/7Tsyc3xIN8XnrSIjJFuK0FsCy7nAhAfJg2rbOAlksA9XCzHLRYh1OiYqS22kfCVbYSBYBVe1lUwRzUutJtYGohqE28dbqnANi3c6qx0dgwdwYQE0HrK4Hb9bgxQHZHcK3pP/cQiKFBNUh71QDt5dZvREpg6o0hquQbSCAABWEEXi+vTmiqOxBAKmKB9kzapxE/HPnGlR7nABUhh6lSBHplgGG3f77iLVSssn0mefahlwBKhRvsTx8qrXWsnFTVF17xVAXHMd5zXaqaBUJPEtcQgUgA4RtQe2Lt1VSvDJC6Hdo4QMlY7vA5v3XM56X5vlQEu1vGI2O2jOKSsXqpMvsUcBOJCam2VAAhcXkJ2F7x7IV1UB+9MsDlYlCCfHPI1yI+Ydq9T1yHFEAifs7duILI7058nWcNk3FK7dArA4jnuSu+BOSLjbdpOGTqt653PwgKVdeiyrsNid5R2Ewz0StkugtgWSCPD1twPzvUB43+jQgmSf0jZABJajRtJO12WoltDdUSx1ak8fckqU1EZrh3DcBdKs0iXOZuo1b7Y+BqT/LU9mCIJeDslC/asw+NWmUB7zj7bFCbv2J7Iwkg7Myg63+UgcFFMI8AokjzDbSzgMj+wOIdXQBVHioVkZQpMHG3iwiGKgx7F4Eh/LLXfmO0xUngEMISK9CTIQv7a3XfvVY+daAWAqBzCoph4LeMj5gBiiI/VSi12hvB7UQwMPHW71H33FXeMN4lC/hPAofEetQi0J4J7EFLOGptuUZ7xvL7USv1FNoZVQCb5fV8HHwBczwRnOZ2+4YSPmTEu3qZQQDunJNrBKVMsI3uBFEWBm3V7iMWgSpbQ3pf4PHK4xTRWZVpj7HZgCg5GDr5OmmkaolhpiUgh/ysukEL7BHtzpIBpAdDphAbEedh5zRDDSAhfxYhDyeE0YHbP1379Gz/d5k7on44YdWaUPKWr9bAsAMEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABCYA4H/AVfWebTuIu23AAAAAElFTkSuQmCC"
+            alt=""
+            aria-hidden="true"
+            decoding="async"
+        >
+        <span class="furatic-own-vote-tooltip__text">Every song starts with one vote.</span>
+    </div>
 </div>
 
 <script>
@@ -752,6 +858,8 @@
     let ownCurrentSongKey = null;
     let decorateQueued = false;
     let errorToastTimer = 0;
+    let ownVoteTooltipHideTimer = 0;
+    let ownVoteTooltipAnchor = null;
 
     try {
         window.localStorage.removeItem("furatic-owned-song-pending-v1");
@@ -760,6 +868,120 @@
         // ignore
     }
 
+    document.addEventListener("pointerdown", function (event) {
+        const target = targetElement(event);
+        const button = isBlockedOwnVoteButton(target);
+        if (!button) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        showOwnVoteTooltip(button);
+    }, true);
+
+    document.addEventListener("click", function (event) {
+        const target = targetElement(event);
+        const button = isBlockedOwnVoteButton(target);
+        if (!button) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        showOwnVoteTooltip(button);
+    }, true);
+
+    document.addEventListener("keydown", function (event) {
+        if (event.key !== "Enter" && event.key !== " ") {
+            return;
+        }
+
+        const target = targetElement(event);
+        const button = isBlockedOwnVoteButton(target);
+        if (!button) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        showOwnVoteTooltip(button);
+    }, true);
+
+    document.addEventListener("pointerover", function (event) {
+        const target = targetElement(event);
+        const button = isBlockedOwnVoteButton(target);
+        if (!button) {
+            return;
+        }
+
+        showOwnVoteTooltip(button);
+    }, { passive: true });
+
+    document.addEventListener("pointermove", function (event) {
+        const target = targetElement(event);
+        const button = isBlockedOwnVoteButton(target);
+        if (!button) {
+            return;
+        }
+
+        if (ownVoteTooltipAnchor === button) {
+            positionOwnVoteTooltip(button);
+        } else {
+            showOwnVoteTooltip(button);
+        }
+    }, { passive: true });
+
+    document.addEventListener("pointerout", function (event) {
+        const target = targetElement(event);
+        const button = isBlockedOwnVoteButton(target);
+        if (!button) {
+            return;
+        }
+
+        const relatedButton = event.relatedTarget instanceof Element
+            ? event.relatedTarget.closest(".vote-up, .vote-down")
+            : null;
+
+        if (relatedButton === button) {
+            return;
+        }
+
+        hideOwnVoteTooltip(false);
+    }, { passive: true });
+
+    document.addEventListener("focusin", function (event) {
+        const target = targetElement(event);
+        const button = isBlockedOwnVoteButton(target);
+        if (!button) {
+            return;
+        }
+
+        showOwnVoteTooltip(button);
+    });
+
+    document.addEventListener("focusout", function (event) {
+        const target = targetElement(event);
+        const button = isBlockedOwnVoteButton(target);
+        if (!button) {
+            return;
+        }
+
+        hideOwnVoteTooltip(false);
+    });
+
+    window.addEventListener("resize", function () {
+        if (ownVoteTooltipAnchor) {
+            positionOwnVoteTooltip(ownVoteTooltipAnchor);
+        }
+    });
+
+    window.addEventListener("scroll", function () {
+        if (ownVoteTooltipAnchor) {
+            positionOwnVoteTooltip(ownVoteTooltipAnchor);
+        }
+    }, true);
+    
     function targetElement(event) {
         return event && event.target instanceof Element ? event.target : null;
     }
@@ -777,6 +999,96 @@
         return Number.isFinite(value) && value > 0 ? value : null;
     }
 
+    function getOwnVoteTooltip() {
+        return document.getElementById("own-vote-tooltip");
+    }
+
+    function getVoteButton(element) {
+        return element ? element.closest(".vote-up, .vote-down") : null;
+    }
+
+    function isBlockedOwnVoteButton(element) {
+        const button = getVoteButton(element);
+        return button && button.getAttribute("data-furatic-own-vote-blocked") === "true"
+            ? button
+            : null;
+    }
+
+    function syncBlockedVoteButtons(row, isBlocked) {
+        if (!row) {
+            return;
+        }
+
+        row.querySelectorAll(".vote-up, .vote-down").forEach(function (button) {
+            if (isBlocked) {
+                button.setAttribute("data-furatic-own-vote-blocked", "true");
+                button.setAttribute("aria-disabled", "true");
+            } else {
+                button.removeAttribute("data-furatic-own-vote-blocked");
+                button.removeAttribute("aria-disabled");
+            }
+        });
+    }
+
+    function positionOwnVoteTooltip(button) {
+        const tooltip = getOwnVoteTooltip();
+        if (!tooltip || !button) {
+            return;
+        }
+
+        tooltip.classList.add("is-visible");
+        tooltip.setAttribute("aria-hidden", "false");
+
+        const buttonRect = button.getBoundingClientRect();
+        const tooltipRect = tooltip.getBoundingClientRect();
+
+        let left = buttonRect.left + (buttonRect.width / 2);
+        const minLeft = 12 + (tooltipRect.width / 2);
+        const maxLeft = window.innerWidth - 12 - (tooltipRect.width / 2);
+
+        if (minLeft <= maxLeft) {
+            left = Math.max(minLeft, Math.min(maxLeft, left));
+        }
+
+        const top = Math.max(tooltipRect.height + 18, buttonRect.top);
+
+        tooltip.style.left = left.toFixed(2) + "px";
+        tooltip.style.top = top.toFixed(2) + "px";
+    }
+
+    function showOwnVoteTooltip(button) {
+        const tooltip = getOwnVoteTooltip();
+        if (!tooltip || !button) {
+            return;
+        }
+
+        ownVoteTooltipAnchor = button;
+        window.clearTimeout(ownVoteTooltipHideTimer);
+        positionOwnVoteTooltip(button);
+    }
+
+    function hideOwnVoteTooltip(immediate) {
+        const tooltip = getOwnVoteTooltip();
+        if (!tooltip) {
+            return;
+        }
+
+        const hide = function () {
+            tooltip.classList.remove("is-visible");
+            tooltip.setAttribute("aria-hidden", "true");
+            ownVoteTooltipAnchor = null;
+        };
+
+        window.clearTimeout(ownVoteTooltipHideTimer);
+
+        if (immediate) {
+            hide();
+            return;
+        }
+
+        ownVoteTooltipHideTimer = window.setTimeout(hide, 90);
+    }
+    
     let ownedOrbAnimationFrame = 0;
 
     function furaticSeedUnit(seed, salt) {
@@ -971,6 +1283,7 @@
 
             row.classList.toggle("furatic-owned-song", isOwned);
             row.classList.toggle("is-removing", key !== null && pendingRemovals.has(key));
+            syncBlockedVoteButtons(row, isOwned);
 
             const existingButton = row.querySelector(".own-song-remove");
 
@@ -996,6 +1309,7 @@
 
             currentSongRow.classList.toggle("furatic-owned-song", isOwnedCurrent);
             currentSongRow.classList.remove("is-removing");
+            syncBlockedVoteButtons(currentSongRow, isOwnedCurrent);
 
             if (isOwnedCurrent && currentKey !== null) {
                 ensureOwnedOrbSeed(currentSongRow, currentKey);
