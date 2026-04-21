@@ -673,12 +673,9 @@
         left: 0;
         top: 0;
         z-index: 9999;
-        display: inline-flex;
-        align-items: center;
-        gap: 10px;
-        max-width: min(310px, calc(100vw - 24px));
+        max-width: min(340px, calc(100vw - 24px));
         padding: 10px 14px;
-        border-radius: 16px;
+        border-radius: 18px;
         border: 1px solid rgba(255,255,255,0.12);
         background:
             linear-gradient(180deg, rgba(16, 22, 40, 0.94), rgba(9, 13, 26, 0.92));
@@ -693,7 +690,7 @@
         opacity: 0;
         visibility: hidden;
         filter: blur(10px);
-        transform: translate3d(-50%, calc(-100% - 14px), 0) scale(0.94);
+        transform: translate3d(-50%, calc(-100% - 12px), 0) scale(0.94);
         transform-origin: bottom center;
         transition:
             opacity 180ms ease,
@@ -706,7 +703,7 @@
         opacity: 1;
         visibility: visible;
         filter: blur(0);
-        transform: translate3d(-50%, calc(-100% - 14px), 0) scale(1);
+        transform: translate3d(-50%, calc(-100% - 12px), 0) scale(1);
         transition:
             opacity 180ms ease,
             transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -714,40 +711,56 @@
             visibility 0s;
     }
     
+    .furatic-own-vote-tooltip::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 100%;
+        transform: translateX(-50%);
+        width: 0;
+        height: 0;
+        border-left: 10px solid transparent;
+        border-right: 10px solid transparent;
+        border-top: 11px solid rgba(255,255,255,0.12);
+    }
+    
     .furatic-own-vote-tooltip::after {
         content: "";
         position: absolute;
         left: 50%;
-        top: calc(100% - 1px);
-        width: 12px;
-        height: 12px;
-        background: rgba(10, 14, 28, 0.96);
-        border-right: 1px solid rgba(255,255,255,0.10);
-        border-bottom: 1px solid rgba(255,255,255,0.10);
-        transform: translateX(-50%) rotate(45deg);
-        box-sizing: border-box;
+        top: 100%;
+        transform: translateX(-50%);
+        width: 0;
+        height: 0;
+        border-left: 9px solid transparent;
+        border-right: 9px solid transparent;
+        border-top: 10px solid rgba(10, 14, 28, 0.96);
     }
     
-    .furatic-own-vote-tooltip__emoji {
-        width: 18px;
-        height: 18px;
-        flex: 0 0 18px;
+    .furatic-own-vote-tooltip__message {
         display: block;
-        object-fit: contain;
-    }
-    
-    .furatic-own-vote-tooltip__text {
+        font-size: 0.94rem;
         font-weight: 600;
         line-height: 1.38;
         letter-spacing: 0.01em;
         text-wrap: pretty;
+        color: inherit;
+    }
+    
+    .furatic-own-vote-tooltip__emoji {
+        width: 1.08em;
+        height: 1.08em;
+        display: inline-block;
+        vertical-align: -0.14em;
+        margin: 0 0.34em 0 0.36em;
+        object-fit: contain;
     }
     
     @media (prefers-reduced-motion: reduce) {
         .furatic-own-vote-tooltip,
         .furatic-own-vote-tooltip.is-visible {
             transition: opacity 120ms ease;
-            transform: translate3d(-50%, calc(-100% - 14px), 0) scale(1);
+            transform: translate3d(-50%, calc(-100% - 12px), 0) scale(1);
             filter: none;
         }
     }
@@ -834,15 +847,17 @@
         role="tooltip"
         aria-hidden="true"
     >
-        <span class="furatic-own-vote-tooltip__text">You can't vote for your own song.</span>
-        <img
-            class="furatic-own-vote-tooltip__emoji"
-            src="data:image/png;base64,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"
-            alt=""
-            aria-hidden="true"
-            decoding="async"
-        >
-        <span class="furatic-own-vote-tooltip__text">Every song starts with one vote.</span>
+        <span class="furatic-own-vote-tooltip__message">
+            You can't vote for your own song
+            <img
+                class="furatic-own-vote-tooltip__emoji"
+                src="data:image/png;base64,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"
+                alt=""
+                aria-hidden="true"
+                decoding="async"
+            >
+            Every song starts with one vote.
+        </span>
     </div>
 </div>
 
