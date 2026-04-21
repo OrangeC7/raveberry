@@ -217,8 +217,10 @@
     }
     
     .list-group-item.furatic-owned-song {
-        --furatic-orb-x: 18%;
-        --furatic-orb-y: 24%;
+        --furatic-orb-1-x: 24%;
+        --furatic-orb-1-y: 28%;
+        --furatic-orb-2-x: 76%;
+        --furatic-orb-2-y: 72%;
         background:
             linear-gradient(180deg, rgba(36, 150, 224, 0.070), rgba(20, 70, 136, 0.028)),
             var(--furatic-panel) !important;
@@ -240,12 +242,20 @@
         opacity: 1;
         background:
             radial-gradient(
-                circle 152px at var(--furatic-orb-x) var(--furatic-orb-y),
+                circle 152px at var(--furatic-orb-1-x) var(--furatic-orb-1-y),
                 rgba(170, 246, 255, 0.28) 0%,
                 rgba(132, 236, 255, 0.20) 18%,
                 rgba(86, 220, 255, 0.12) 36%,
                 rgba(78, 210, 255, 0.055) 56%,
                 rgba(78, 210, 255, 0.00) 74%
+            ),
+            radial-gradient(
+                circle 132px at var(--furatic-orb-2-x) var(--furatic-orb-2-y),
+                rgba(146, 234, 255, 0.20) 0%,
+                rgba(112, 214, 255, 0.15) 20%,
+                rgba(86, 220, 255, 0.095) 38%,
+                rgba(78, 210, 255, 0.045) 58%,
+                rgba(78, 210, 255, 0.00) 76%
             ),
             linear-gradient(180deg, rgba(78, 210, 255, 0.022), rgba(255,255,255,0));
         box-shadow:
@@ -1178,45 +1188,74 @@
             return;
         }
     
-        const seed = Number(key) || 1;
+        const baseSeed = Number(key) || 1;
     
-        const baseX = 50 + (furaticSeedUnit(seed, 1) - 0.5) * 10;
-        const baseY = 50 + (furaticSeedUnit(seed, 2) - 0.5) * 14;
+        function assignOrb(datasetPrefix, cssPrefix, seed, config, saltOffset) {
+            const baseX = config.baseXMin + furaticSeedUnit(seed, saltOffset + 1) * (config.baseXMax - config.baseXMin);
+            const baseY = config.baseYMin + furaticSeedUnit(seed, saltOffset + 2) * (config.baseYMax - config.baseYMin);
     
-        const travelX = 18 + furaticSeedUnit(seed, 3) * 10;
-        const travelY = 16 + furaticSeedUnit(seed, 4) * 9;
+            const travelX = config.travelXMin + furaticSeedUnit(seed, saltOffset + 3) * (config.travelXMax - config.travelXMin);
+            const travelY = config.travelYMin + furaticSeedUnit(seed, saltOffset + 4) * (config.travelYMax - config.travelYMin);
     
-        const detailX = 5 + furaticSeedUnit(seed, 5) * 4.5;
-        const detailY = 4 + furaticSeedUnit(seed, 6) * 4;
+            const detailX = config.detailXMin + furaticSeedUnit(seed, saltOffset + 5) * (config.detailXMax - config.detailXMin);
+            const detailY = config.detailYMin + furaticSeedUnit(seed, saltOffset + 6) * (config.detailYMax - config.detailYMin);
     
-        const speedA = 0.42 + furaticSeedUnit(seed, 7) * 0.18;
-        const speedB = 0.63 + furaticSeedUnit(seed, 8) * 0.20;
-        const speedC = 0.50 + furaticSeedUnit(seed, 9) * 0.18;
-        const speedD = 0.74 + furaticSeedUnit(seed, 10) * 0.22;
+            const speedA = config.speedAMin + furaticSeedUnit(seed, saltOffset + 7) * (config.speedAMax - config.speedAMin);
+            const speedB = config.speedBMin + furaticSeedUnit(seed, saltOffset + 8) * (config.speedBMax - config.speedBMin);
+            const speedC = config.speedCMin + furaticSeedUnit(seed, saltOffset + 9) * (config.speedCMax - config.speedCMin);
+            const speedD = config.speedDMin + furaticSeedUnit(seed, saltOffset + 10) * (config.speedDMax - config.speedDMin);
     
-        const phaseA = furaticSeedUnit(seed, 11) * Math.PI * 2;
-        const phaseB = furaticSeedUnit(seed, 12) * Math.PI * 2;
-        const phaseC = furaticSeedUnit(seed, 13) * Math.PI * 2;
-        const phaseD = furaticSeedUnit(seed, 14) * Math.PI * 2;
+            const phaseA = furaticSeedUnit(seed, saltOffset + 11) * Math.PI * 2;
+            const phaseB = furaticSeedUnit(seed, saltOffset + 12) * Math.PI * 2;
+            const phaseC = furaticSeedUnit(seed, saltOffset + 13) * Math.PI * 2;
+            const phaseD = furaticSeedUnit(seed, saltOffset + 14) * Math.PI * 2;
+    
+            element.dataset[datasetPrefix + "BaseX"] = baseX.toFixed(4);
+            element.dataset[datasetPrefix + "BaseY"] = baseY.toFixed(4);
+            element.dataset[datasetPrefix + "TravelX"] = travelX.toFixed(4);
+            element.dataset[datasetPrefix + "TravelY"] = travelY.toFixed(4);
+            element.dataset[datasetPrefix + "DetailX"] = detailX.toFixed(4);
+            element.dataset[datasetPrefix + "DetailY"] = detailY.toFixed(4);
+            element.dataset[datasetPrefix + "SpeedA"] = speedA.toFixed(4);
+            element.dataset[datasetPrefix + "SpeedB"] = speedB.toFixed(4);
+            element.dataset[datasetPrefix + "SpeedC"] = speedC.toFixed(4);
+            element.dataset[datasetPrefix + "SpeedD"] = speedD.toFixed(4);
+            element.dataset[datasetPrefix + "PhaseA"] = phaseA.toFixed(4);
+            element.dataset[datasetPrefix + "PhaseB"] = phaseB.toFixed(4);
+            element.dataset[datasetPrefix + "PhaseC"] = phaseC.toFixed(4);
+            element.dataset[datasetPrefix + "PhaseD"] = phaseD.toFixed(4);
+    
+            element.style.setProperty("--furatic-" + cssPrefix + "-x", baseX.toFixed(2) + "%");
+            element.style.setProperty("--furatic-" + cssPrefix + "-y", baseY.toFixed(2) + "%");
+        }
     
         element.dataset.furaticOrbSeedFor = seedFor;
-        element.dataset.furaticOrbBaseX = baseX.toFixed(4);
-        element.dataset.furaticOrbBaseY = baseY.toFixed(4);
-        element.dataset.furaticOrbTravelX = travelX.toFixed(4);
-        element.dataset.furaticOrbTravelY = travelY.toFixed(4);
-        element.dataset.furaticOrbDetailX = detailX.toFixed(4);
-        element.dataset.furaticOrbDetailY = detailY.toFixed(4);
-        element.dataset.furaticOrbSpeedA = speedA.toFixed(4);
-        element.dataset.furaticOrbSpeedB = speedB.toFixed(4);
-        element.dataset.furaticOrbSpeedC = speedC.toFixed(4);
-        element.dataset.furaticOrbSpeedD = speedD.toFixed(4);
-        element.dataset.furaticOrbPhaseA = phaseA.toFixed(4);
-        element.dataset.furaticOrbPhaseB = phaseB.toFixed(4);
-        element.dataset.furaticOrbPhaseC = phaseC.toFixed(4);
-        element.dataset.furaticOrbPhaseD = phaseD.toFixed(4);
     
-        element.style.setProperty("--furatic-orb-x", baseX.toFixed(2) + "%");
-        element.style.setProperty("--furatic-orb-y", baseY.toFixed(2) + "%");
+        assignOrb("furaticOrb1", "orb-1", baseSeed * 1.137 + 11.0, {
+            baseXMin: 22, baseXMax: 38,
+            baseYMin: 20, baseYMax: 40,
+            travelXMin: 8, travelXMax: 14,
+            travelYMin: 7, travelYMax: 13,
+            detailXMin: 3.5, detailXMax: 6.5,
+            detailYMin: 3.0, detailYMax: 5.8,
+            speedAMin: 0.38, speedAMax: 0.54,
+            speedBMin: 0.60, speedBMax: 0.78,
+            speedCMin: 0.46, speedCMax: 0.62,
+            speedDMin: 0.68, speedDMax: 0.88
+        }, 0);
+    
+        assignOrb("furaticOrb2", "orb-2", baseSeed * 1.619 + 29.0, {
+            baseXMin: 62, baseXMax: 78,
+            baseYMin: 56, baseYMax: 76,
+            travelXMin: 8, travelXMax: 14,
+            travelYMin: 7, travelYMax: 12.5,
+            detailXMin: 3.2, detailXMax: 6.2,
+            detailYMin: 2.8, detailYMax: 5.4,
+            speedAMin: 0.42, speedAMax: 0.60,
+            speedBMin: 0.66, speedBMax: 0.86,
+            speedCMin: 0.50, speedCMax: 0.68,
+            speedDMin: 0.74, speedDMax: 0.96
+        }, 20);
     
         ensureOwnedOrbAnimation();
     }
@@ -1235,39 +1274,55 @@
     
         const t = now * 0.00078;
     
-        ownedElements.forEach(function (element) {
-            const baseX = Number(element.dataset.furaticOrbBaseX || 50);
-            const baseY = Number(element.dataset.furaticOrbBaseY || 50);
-            const travelX = Number(element.dataset.furaticOrbTravelX || 22);
-            const travelY = Number(element.dataset.furaticOrbTravelY || 20);
-            const detailX = Number(element.dataset.furaticOrbDetailX || 6);
-            const detailY = Number(element.dataset.furaticOrbDetailY || 5);
-            const speedA = Number(element.dataset.furaticOrbSpeedA || 0.5);
-            const speedB = Number(element.dataset.furaticOrbSpeedB || 0.7);
-            const speedC = Number(element.dataset.furaticOrbSpeedC || 0.56);
-            const speedD = Number(element.dataset.furaticOrbSpeedD || 0.82);
-            const phaseA = Number(element.dataset.furaticOrbPhaseA || 0);
-            const phaseB = Number(element.dataset.furaticOrbPhaseB || 0);
-            const phaseC = Number(element.dataset.furaticOrbPhaseC || 0);
-            const phaseD = Number(element.dataset.furaticOrbPhaseD || 0);
+        function updateOrb(element, datasetPrefix, cssPrefix, clamps) {
+            const baseX = Number(element.dataset[datasetPrefix + "BaseX"] || 50);
+            const baseY = Number(element.dataset[datasetPrefix + "BaseY"] || 50);
+            const travelX = Number(element.dataset[datasetPrefix + "TravelX"] || 12);
+            const travelY = Number(element.dataset[datasetPrefix + "TravelY"] || 10);
+            const detailX = Number(element.dataset[datasetPrefix + "DetailX"] || 5);
+            const detailY = Number(element.dataset[datasetPrefix + "DetailY"] || 4);
+            const speedA = Number(element.dataset[datasetPrefix + "SpeedA"] || 0.5);
+            const speedB = Number(element.dataset[datasetPrefix + "SpeedB"] || 0.7);
+            const speedC = Number(element.dataset[datasetPrefix + "SpeedC"] || 0.56);
+            const speedD = Number(element.dataset[datasetPrefix + "SpeedD"] || 0.82);
+            const phaseA = Number(element.dataset[datasetPrefix + "PhaseA"] || 0);
+            const phaseB = Number(element.dataset[datasetPrefix + "PhaseB"] || 0);
+            const phaseC = Number(element.dataset[datasetPrefix + "PhaseC"] || 0);
+            const phaseD = Number(element.dataset[datasetPrefix + "PhaseD"] || 0);
     
             const x = baseX
                 + Math.sin(t * speedA + phaseA) * travelX
                 + Math.sin(t * speedB + phaseB) * detailX
                 + Math.cos(t * (speedA * 0.57 + speedC * 0.43) + phaseC) * (detailX * 0.72)
-                + Math.sin(t * (speedD * 0.22) + phaseD) * 2.4;
+                + Math.sin(t * (speedD * 0.22) + phaseD) * 1.9;
     
             const y = baseY
                 + Math.cos(t * speedC + phaseC) * travelY
                 + Math.sin(t * speedD + phaseD) * detailY
                 + Math.sin(t * (speedC * 0.61 + speedA * 0.39) + phaseA) * (detailY * 0.76)
-                + Math.cos(t * (speedB * 0.18) + phaseB) * 2.1;
+                + Math.cos(t * (speedB * 0.18) + phaseB) * 1.7;
     
-            const clampedX = Math.max(14, Math.min(86, x));
-            const clampedY = Math.max(16, Math.min(84, y));
+            const clampedX = Math.max(clamps.minX, Math.min(clamps.maxX, x));
+            const clampedY = Math.max(clamps.minY, Math.min(clamps.maxY, y));
     
-            element.style.setProperty("--furatic-orb-x", clampedX.toFixed(2) + "%");
-            element.style.setProperty("--furatic-orb-y", clampedY.toFixed(2) + "%");
+            element.style.setProperty("--furatic-" + cssPrefix + "-x", clampedX.toFixed(2) + "%");
+            element.style.setProperty("--furatic-" + cssPrefix + "-y", clampedY.toFixed(2) + "%");
+        }
+    
+        ownedElements.forEach(function (element) {
+            updateOrb(element, "furaticOrb1", "orb-1", {
+                minX: 10,
+                maxX: 48,
+                minY: 14,
+                maxY: 56
+            });
+    
+            updateOrb(element, "furaticOrb2", "orb-2", {
+                minX: 52,
+                maxX: 90,
+                minY: 42,
+                maxY: 86
+            });
         });
     
         ownedOrbAnimationFrame = window.requestAnimationFrame(animateOwnedOrbs);
