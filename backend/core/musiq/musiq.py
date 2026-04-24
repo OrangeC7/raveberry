@@ -139,7 +139,6 @@ def try_providers(session_key: str, providers: List[MusicProvider]) -> MusicProv
     """Goes through every given provider and tries to request its music.
     Returns the first provider that was successful with an empty error.
     If unsuccessful, return the last provider."""
-
     fallback = False
     last_provider = providers[-1]
     provider = providers[0]
@@ -154,8 +153,33 @@ def try_providers(session_key: str, providers: List[MusicProvider]) -> MusicProv
             # in new music only mode, do not allow fallbacks
             if storage.get("new_music_only") or provider == last_provider:
                 return provider
+
             fallback = True
-    provider.error = ""
+            provider.error = ""
+        except Exception:  # pylint: disable=broad-except
+            logging.exception(
+                "provider request failed for type=%s query=%r key=%r",
+                provider.type,
+                provider.query,
+                provider.key,
+            )
+
+            if isinstance(provider, SongProvider) and provider.queued_song:
+                try:
+                    provider.remove_placeholder()
+                except Exception:  # pylint: disable=broad-except
+                    logging.exception(
+                        "failed to remove placeholder after provider request failure"
+                    )
+
+            provider.error = "Sorry, this request timed out or failed. Please try again."
+
+            if storage.get("new_music_only") or provider == last_provider:
+                return provider
+
+            fallback = True
+            provider.error = ""
+
     if fallback:
         provider.ok_message += " (used fallback)"
     return provider
