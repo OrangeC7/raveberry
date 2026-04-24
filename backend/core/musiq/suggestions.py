@@ -3,9 +3,12 @@ type into the input field on the musiq page."""
 
 from __future__ import annotations
 
+import logging
 import random
 import threading
-from typing import Any, Dict, Iterable, List, Mapping, TypedDict, Union, cast
+import time
+
+from typing import Any, Callable, Dict, Iterable, List, Mapping, TypedDict, Union, cast
 
 from django.core.handlers.wsgi import WSGIRequest
 from django.db.models import F, Q
@@ -19,6 +22,8 @@ from core.musiq import song_utils
 from core.settings import storage
 from core.settings.storage import PlatformEnabled, PlatformSuggestions
 from main import settings
+
+ONLINE_SUGGESTION_TIMEOUT_SECONDS = 3
 
 u_values_list = [
     "u_id",
@@ -145,18 +150,36 @@ def online_suggestions(request: WSGIRequest) -> JsonResponse:
             "jamendo": fetch_jamendo,
         }
 
+        def safe_fetch(platform: str, fetcher: Callable[[], None]) -> None:
+            try:
+                fetcher()
+            except Exception:  # pylint: disable=broad-except
+                logging.exception("online %s suggestions failed", platform)
+
         for platform in ["youtube", "spotify", "soundcloud", "jamendo"]:
             if (
                 storage.get(cast(PlatformEnabled, f"{platform}_enabled"))
                 and storage.get(cast(PlatformSuggestions, f"{platform}_suggestions"))
                 > 0
             ):
-                thread = threading.Thread(target=suggestion_fetchers[platform])
+                thread = threading.Thread(
+                    target=safe_fetch,
+                    args=(platform, suggestion_fetchers[platform]),
+                    daemon=True,
+                )
                 threads.append(thread)
                 thread.start()
 
+        deadline = time.monotonic() + ONLINE_SUGGESTION_TIMEOUT_SECONDS
         for thread in threads:
-            thread.join()
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            thread.join(remaining)
+
+        for thread in threads:
+            if thread.is_alive():
+                logging.warning("online suggestion provider timed out")
 
     return JsonResponse(results, safe=False)
 
