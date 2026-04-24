@@ -116,11 +116,14 @@ class SongProvider(MusicProvider):
             try:
                 archived_song = ArchivedSong.objects.get(id=self.key)
                 return self.__class__.get_id_from_external_url(archived_song.url)
-            except ArchivedSong.DoesNotExist:
+            except (ArchivedSong.DoesNotExist, KeyError, ValueError):
                 return None
+
         if self.query is not None:
             url_type = song_utils.determine_url_type(self.query)
+
             provider_class: Optional[Type[SongProvider]] = None
+
             if url_type == "local":
                 from core.musiq.local import LocalSongProvider
 
@@ -129,10 +132,12 @@ class SongProvider(MusicProvider):
                 from core.musiq.youtube import YoutubeSongProvider
 
                 provider_class = YoutubeSongProvider
+
             if storage.get("spotify_enabled") and url_type == "spotify":
                 from core.musiq.spotify import SpotifySongProvider
 
                 provider_class = SpotifySongProvider
+
             if storage.get("soundcloud_enabled") and url_type == "soundcloud":
                 from core.musiq.soundcloud import SoundcloudSongProvider
 
@@ -141,13 +146,19 @@ class SongProvider(MusicProvider):
                 from core.musiq.jamendo import JamendoSongProvider
 
                 provider_class = JamendoSongProvider
+
             if provider_class is not None:
-                return provider_class.get_id_from_external_url(self.query)
+                try:
+                    return provider_class.get_id_from_external_url(self.query)
+                except (KeyError, ValueError):
+                    return None
+
             try:
                 archived_song = ArchivedSong.objects.get(url=self.query)
                 return self.__class__.get_id_from_external_url(archived_song.url)
-            except ArchivedSong.DoesNotExist:
+            except (ArchivedSong.DoesNotExist, KeyError, ValueError):
                 return None
+
         logging.error("Can not extract id because neither key nor query are known")
         return None
 
