@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import errno
+import functools
 import logging
 import os
 import pickle
@@ -72,6 +73,19 @@ class YoutubeDLLogger:
         logging.error(msg)
 
 
+YTMUSIC_TIMEOUT_SECONDS = 8
+
+
+def get_ytmusic() -> ytmusicapi.YTMusic:
+    """Return a YTMusic client with a short timeout so requests cannot hang forever."""
+    session = requests.Session()
+    session.request = functools.partial(  # type: ignore[method-assign]
+        session.request,
+        timeout=YTMUSIC_TIMEOUT_SECONDS,
+    )
+    return ytmusicapi.YTMusic(requests_session=session)
+
+
 class Youtube:
     """This class contains code for both the song and playlist provider"""
 
@@ -112,21 +126,30 @@ class Youtube:
     @staticmethod
     def get_search_suggestions(query: str) -> List[str]:
         """Returns a list of suggestions for the given query from Youtube."""
-        with youtube_session() as session:
-            params = {
-                "client": "youtube",
-                "q": query[:100],  # queries longer than 100 characters are not accepted
-                "xhr": "t",  # this makes the response be a json file
-            }
-            response = session.get(
-                "https://clients1.google.com/complete/search", params=params
-            )
-        suggestions = ytmusicapi.YTMusic().get_search_suggestions(query)
+        try:
+            with youtube_session() as session:
+                params = {
+                    "client": "youtube",
+                    "q": query[:100],  # queries longer than 100 characters are not accepted
+                    "xhr": "t",  # this makes the response be a json file
+                }
+                session.get(
+                    "https://clients1.google.com/complete/search",
+                    params=params,
+                    timeout=YTMUSIC_TIMEOUT_SECONDS,
+                )
+
+            suggestions = get_ytmusic().get_search_suggestions(query)
+        except Exception as error:  # pylint: disable=broad-except
+            logging.warning("youtube suggestions failed for %r: %s", query, error)
+            return []
+
         try:
             if suggestions[0] == query:
                 suggestions = suggestions[1:]
         except IndexError:
             return []
+
         return suggestions
 
 
@@ -241,7 +264,7 @@ class YoutubeSongProvider(SongProvider, Youtube):
         else:
             # do not filter to only receive "song" results, because we would skip the top result
             try:
-                results = ytmusicapi.YTMusic().search(query)
+                results = get_ytmusic().search(query)
             except Exception as error:
                 logging.warning("ytmusic search failed for %r: %s", query, error)
                 try:
@@ -397,7 +420,7 @@ class YoutubeSongProvider(SongProvider, Youtube):
         return True
 
     def get_suggestion(self) -> str:
-        result = ytmusicapi.YTMusic().get_watch_playlist(self.id, limit=2)
+        result = get_ytmusic().get_watch_playlist(self.id, limit=2)
 
         # the first entry usually is the song itself -> use the second one
         suggested_id = result["tracks"][1]["videoId"]
@@ -408,7 +431,7 @@ class YoutubeSongProvider(SongProvider, Youtube):
         if not self.id:
             raise ValueError()
 
-        result = ytmusicapi.YTMusic().get_watch_playlist(
+        result = get_ytmusic().get_watch_playlist(
             self.id, limit=storage.get("max_playlist_items"), radio=True
         )
 
@@ -447,7 +470,7 @@ class YoutubePlaylistProvider(PlaylistProvider, Youtube):
         return self.id.startswith("RD")
 
     def search_id(self) -> Optional[str]:
-        results = ytmusicapi.YTMusic().search(self.query)
+        results = get_ytmusic().search(self.query)
 
         for result in results:
             if result["resultType"] not in (
@@ -470,10 +493,10 @@ class YoutubePlaylistProvider(PlaylistProvider, Youtube):
             return True
 
         try:
-            result = ytmusicapi.YTMusic().get_playlist(self.id)
-        except Exception as e:
-            # query was not a playlist url -> search for the query
-            assert False
+            result = get_ytmusic().get_playlist(self.id)
+        except Exception as error:  # pylint: disable=broad-except
+            logging.warning("youtube playlist metadata failed for %s: %s", self.id, error)
+            return False
 
         assert self.id == result["id"]
         self.title = result["title"]
