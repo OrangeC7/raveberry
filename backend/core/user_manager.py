@@ -20,6 +20,8 @@ from django.db import transaction
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.utils import timezone
 
+from redis.exceptions import RedisError
+
 from core import redis
 
 # kick users after some time without any request
@@ -381,22 +383,30 @@ def remember_requester_ip(request_ip: str, queue_key: int) -> None:
     normalized = _normalize_ip(request_ip)
     if not normalized:
         return
-    redis.connection.set(
-        _requester_ip_key(queue_key),
-        normalized,
-        ex=REQUESTER_IP_TTL_SECONDS,
-    )
 
+    try:
+        redis.connection.set(
+            _requester_ip_key(queue_key),
+            normalized,
+            ex=REQUESTER_IP_TTL_SECONDS,
+        )
+    except RedisError as error:
+        logger.warning("failed to remember requester IP for %s: %s", queue_key, error)
 
 def get_song_requester_ip(queue_key: int) -> str:
     """Return the requester IP stored for the given queue / current-song key."""
-    return redis.connection.get(_requester_ip_key(queue_key)) or ""
+    try:
+        return redis.connection.get(_requester_ip_key(queue_key)) or ""
+    except RedisError as error:
+        logger.warning("failed to read requester IP for %s: %s", queue_key, error)
+        return ""
 
 def song_belongs_to_ip(request_ip: str, queue_key: int) -> bool:
     """Return whether the given queue entry belongs to the given requester IP."""
     normalized = _normalize_ip(request_ip)
     if not normalized:
         return False
+
     return get_song_requester_ip(queue_key) == normalized
 
 
@@ -414,13 +424,16 @@ def can_self_remove_song(request_ip: str) -> bool:
     cutoff = now - SELF_REMOVE_WINDOW_SECONDS
     key = _self_remove_key(normalized)
 
-    pipe = redis.connection.pipeline()
-    pipe.zremrangebyscore(key, "-inf", cutoff)
-    pipe.zcount(key, cutoff, "+inf")
-    pipe.expire(key, SELF_REMOVE_TTL_SECONDS)
-    _, count, _ = pipe.execute()
-
-    return int(count) < MAX_SELF_REMOVE_ACTIONS
+    try:
+        pipe = redis.connection.pipeline()
+        pipe.zremrangebyscore(key, "-inf", cutoff)
+        pipe.zcount(key, cutoff, "+inf")
+        pipe.expire(key, SELF_REMOVE_TTL_SECONDS)
+        _, count, _ = pipe.execute()
+        return int(count) < MAX_SELF_REMOVE_ACTIONS
+    except RedisError as error:
+        logger.warning("failed to check self-remove limit for %s: %s", normalized, error)
+        return False
 
 
 def record_self_remove(request_ip: str, queue_key: int) -> None:
@@ -433,32 +446,43 @@ def record_self_remove(request_ip: str, queue_key: int) -> None:
     key = _self_remove_key(normalized)
     member = f"{now}:{queue_key}"
 
-    pipe = redis.connection.pipeline()
-    pipe.zadd(key, {member: now})
-    pipe.zremrangebyscore(key, "-inf", cutoff)
-    pipe.expire(key, SELF_REMOVE_TTL_SECONDS)
-    pipe.execute()
+    try:
+        pipe = redis.connection.pipeline()
+        pipe.zadd(key, {member: now})
+        pipe.zremrangebyscore(key, "-inf", cutoff)
+        pipe.expire(key, SELF_REMOVE_TTL_SECONDS)
+        pipe.execute()
+    except RedisError as error:
+        logger.warning("failed to record self-remove for %s: %s", normalized, error)
 
 def ip_has_active_queue_slot(request_ip: str) -> bool:
     """Return whether the given IP currently owns a queued song slot."""
     normalized = _normalize_ip(request_ip)
     if not normalized:
         return False
-    return bool(redis.connection.get(_queue_slot_key(normalized)))
+
+    try:
+        return bool(redis.connection.get(_queue_slot_key(normalized)))
+    except RedisError as error:
+        logger.warning("failed to check queue slot for %s: %s", normalized, error)
+        return False
 
 
 def claim_queue_slot(request_ip: str, queue_key: int) -> bool:
     """Claim the single queued-song slot for the given IP.
 
     Returns False if the IP already has another song in the queue.
+
     """
     normalized = _normalize_ip(request_ip)
     if not normalized:
         return True
 
     remember_requester_ip(normalized, queue_key)
+
     slot_key = _queue_slot_key(normalized)
     requester_key = _requester_ip_key(queue_key)
+
     allowed = True
 
     def check_entry(pipe) -> None:
@@ -467,13 +491,18 @@ def claim_queue_slot(request_ip: str, queue_key: int) -> bool:
         if existing not in (None, "", str(queue_key)):
             allowed = False
             return
+
         allowed = True
         pipe.multi()
         pipe.set(slot_key, queue_key, ex=QUEUE_SLOT_TTL_SECONDS)
         pipe.set(requester_key, normalized, ex=REQUESTER_IP_TTL_SECONDS)
 
-    redis.connection.transaction(check_entry, slot_key)
-    return allowed
+    try:
+        redis.connection.transaction(check_entry, slot_key)
+        return allowed
+    except RedisError as error:
+        logger.warning("failed to claim queue slot for %s: %s", normalized, error)
+        return True
 
 
 def release_queue_slot_for_song(queue_key: int) -> None:
@@ -483,19 +512,27 @@ def release_queue_slot_for_song(queue_key: int) -> None:
         return
 
     slot_key = _queue_slot_key(requester_ip)
-    current_value = redis.connection.get(slot_key)
-    pipe = redis.connection.pipeline()
-    if current_value == str(queue_key):
-        pipe.delete(slot_key)
-    pipe.expire(_requester_ip_key(queue_key), REQUESTER_IP_TTL_SECONDS)
-    pipe.execute()
+
+    try:
+        current_value = redis.connection.get(slot_key)
+
+        pipe = redis.connection.pipeline()
+        if current_value == str(queue_key):
+            pipe.delete(slot_key)
+        pipe.expire(_requester_ip_key(queue_key), REQUESTER_IP_TTL_SECONDS)
+        pipe.execute()
+    except RedisError as error:
+        logger.warning("failed to release queue slot for %s: %s", queue_key, error)
 
 
 def clear_queue_slots() -> None:
     """Clear all active single-song queue ownership locks."""
-    keys = list(redis.connection.scan_iter(match="queue-slot:*") )
-    if keys:
-        redis.connection.delete(*keys)
+    try:
+        keys = list(redis.connection.scan_iter(match="queue-slot:*"))
+        if keys:
+            redis.connection.delete(*keys)
+    except RedisError as error:
+        logger.warning("failed to clear queue slots: %s", error)
 
 
 def update_user_count() -> None:
