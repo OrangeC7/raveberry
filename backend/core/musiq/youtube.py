@@ -242,7 +242,13 @@ class YoutubeSongProvider(SongProvider, Youtube):
         def extract_info(video_id: str) -> bool:
             try:
                 with yt_dlp.YoutubeDL(Youtube.get_ydl_opts()) as ydl:
-                    self.info_dict = ydl.extract_info(video_id, download=False) or {}
+                    info = ydl.extract_info(video_id, download=False) or {}
+
+                if not info:
+                    return False
+
+                self.info_dict = info
+                self.error = ""
                 return True
             except (yt_dlp.utils.ExtractorError, yt_dlp.utils.DownloadError) as error:
                 logging.warning("error during availability check for %s:", video_id)
@@ -279,6 +285,7 @@ class YoutubeSongProvider(SongProvider, Youtube):
                         if duration is not None and duration > self.MAX_DURATION_SECONDS:
                             continue
                         self.info_dict = entry
+                        self.error = ""
                         break
                 except (yt_dlp.utils.ExtractorError, yt_dlp.utils.DownloadError) as fallback_error:
                     logging.warning(
