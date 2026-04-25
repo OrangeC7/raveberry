@@ -107,6 +107,9 @@ def _normalize_ip(value: str) -> str:
     except ValueError:
         return ""
 
+def normalize_ip(value: str) -> str:
+    """Public wrapper for normalized client/requester IP comparisons."""
+    return _normalize_ip(value)
 
 def _normalize_ip_collection(values: Iterable[str]) -> list[str]:
     normalized = {_normalize_ip(value) for value in values}
@@ -378,8 +381,12 @@ def _requester_ip_key(queue_key: int) -> str:
     return f"queue-requester:{queue_key}"
 
 
-def remember_requester_ip(request_ip: str, queue_key: int) -> None:
-    """Store requester IP metadata for moderator tooling and exports."""
+def remember_requester_ip(
+    request_ip: str,
+    queue_key: int,
+    session_key: str = "",
+) -> None:
+    """Store requester IP metadata for ownership, moderation, and exports."""
     normalized = _normalize_ip(request_ip)
     if not normalized:
         return
@@ -391,14 +398,60 @@ def remember_requester_ip(request_ip: str, queue_key: int) -> None:
             ex=REQUESTER_IP_TTL_SECONDS,
         )
     except RedisError as error:
-        logger.warning("failed to remember requester IP for %s: %s", queue_key, error)
+        logger.warning("failed to remember requester IP in redis for %s: %s", queue_key, error)
+
+    try:
+        from core import models
+
+        updates = {"requester_ip": normalized}
+        if session_key:
+            updates["requester_session_key"] = session_key
+
+        models.QueuedSong.objects.filter(id=queue_key).update(**updates)
+        models.CurrentSong.objects.filter(queue_key=queue_key).update(**updates)
+    except Exception as error:  # pylint: disable=broad-except
+        logger.warning("failed to remember requester IP in database for %s: %s", queue_key, error)
 
 def get_song_requester_ip(queue_key: int) -> str:
     """Return the requester IP stored for the given queue / current-song key."""
     try:
-        return redis.connection.get(_requester_ip_key(queue_key)) or ""
+        requester_ip = redis.connection.get(_requester_ip_key(queue_key)) or ""
+        if requester_ip:
+            return requester_ip
     except RedisError as error:
-        logger.warning("failed to read requester IP for %s: %s", queue_key, error)
+        logger.warning("failed to read requester IP from redis for %s: %s", queue_key, error)
+
+    try:
+        from core import models
+
+        requester_ip = (
+            models.QueuedSong.objects.filter(id=queue_key)
+            .values_list("requester_ip", flat=True)
+            .first()
+            or ""
+        )
+
+        if not requester_ip:
+            requester_ip = (
+                models.CurrentSong.objects.filter(queue_key=queue_key)
+                .values_list("requester_ip", flat=True)
+                .first()
+                or ""
+            )
+
+        requester_ip = _normalize_ip(requester_ip)
+        if requester_ip:
+            try:
+                redis.connection.set(
+                    _requester_ip_key(queue_key),
+                    requester_ip,
+                    ex=REQUESTER_IP_TTL_SECONDS,
+                )
+            except RedisError:
+                pass
+        return requester_ip
+    except Exception as error:  # pylint: disable=broad-except
+        logger.warning("failed to read requester IP from database for %s: %s", queue_key, error)
         return ""
 
 def song_belongs_to_ip(request_ip: str, queue_key: int) -> bool:
