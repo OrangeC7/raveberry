@@ -162,7 +162,12 @@ class SongProvider(MusicProvider):
         logging.error("Can not extract id because neither key nor query are known")
         return None
 
-    def enqueue_placeholder(self, manually_requested) -> None:
+    def enqueue_placeholder(
+        self,
+        manually_requested,
+        requester_ip: str = "",
+        requester_session_key: str = "",
+    ) -> None:
         metadata: Metadata = {
             "artist": "",
             "title": self.query or self.get_external_url(),
@@ -178,6 +183,8 @@ class SongProvider(MusicProvider):
             manually_requested,
             votes=initial_votes,
             enqueue_first=storage.get("enqueue_first"),
+            requester_ip=requester_ip,
+            requester_session_key=requester_session_key,
         )
 
     def remove_placeholder(self) -> None:
