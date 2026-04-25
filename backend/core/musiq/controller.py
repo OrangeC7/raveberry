@@ -296,22 +296,34 @@ def remove_own_song(request: WSGIRequest) -> HttpResponse:
 
 
 def own_song_state(request: WSGIRequest) -> HttpResponse:
-    """Return the current requester's queued songs and current-song ownership."""
+    """Return the current requester's queued song and current-song ownership.
+
+    Keep this endpoint cheap. It is polled by every connected client, so it must
+    not scan Redis once per queue entry.
+    """
     request_ip = user_manager.get_client_ip(request)
     songs = []
 
-    for position, song in enumerate(musiq.ordered_queue_queryset(), start=1):
-        if user_manager.song_belongs_to_ip(request_ip, song.id):
-            songs.append(
-                {
-                    "queueKey": song.id,
-                    "queuePosition": position,
-                }
-            )
+    active_queue_key = user_manager.get_active_queue_slot(request_ip)
+
+    if active_queue_key is not None:
+        for position, song in enumerate(musiq.ordered_queue_queryset(), start=1):
+            if song.id == active_queue_key:
+                songs.append(
+                    {
+                        "queueKey": song.id,
+                        "queuePosition": position,
+                    }
+                )
+                break
 
     current_song_queue_key = None
     current_song = models.CurrentSong.objects.first()
-    if current_song and user_manager.song_belongs_to_ip(request_ip, current_song.queue_key):
+    if (
+        current_song
+        and user_manager.get_song_requester_ip(current_song.queue_key)
+        == user_manager._normalize_ip(request_ip)  # pylint: disable=protected-access
+    ):
         current_song_queue_key = current_song.queue_key
 
     return JsonResponse({
