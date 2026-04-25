@@ -212,7 +212,7 @@ LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "logged-in"
 LOGOUT_REDIRECT_URL = "base"
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 21
-SESSION_SAVE_EVERY_REQUEST = True
+SESSION_SAVE_EVERY_REQUEST = False
 
 trusted_proxy_ips = config.get("trusted_proxy_ips", ["127.0.0.1", "::1"])
 env_trusted_proxy_ips = os.environ.get("TRUSTED_PROXY_IPS", "").strip()
