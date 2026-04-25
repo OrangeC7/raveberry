@@ -1,12 +1,13 @@
 """This module provides common functionality for all pages on the site."""
 
+import logging
 import os
 import random
 import secrets
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from django.core.handlers.wsgi import WSGIRequest
-from django.db import transaction
+from django.db import DatabaseError, transaction
 from django.http import HttpResponseBadRequest, HttpResponseRedirect
 from django.http.response import HttpResponse, JsonResponse
 from django.views.decorators.http import require_POST
@@ -75,12 +76,37 @@ def _furatic_public_context() -> Dict[str, Any]:
 
 RUNTIME_INSTANCE_ID = secrets.token_hex(8)
 
+logger = logging.getLogger(__name__)
+_visitor_count_cache: Optional[int] = None
+
+
+def _get_visitor_count() -> int:
+    """Return the visitor count without making every state poll require DB access."""
+    global _visitor_count_cache
+
+    if _visitor_count_cache is not None:
+        return _visitor_count_cache
+
+    try:
+        _visitor_count_cache = models.Counter.objects.get_or_create(
+            id=1,
+            defaults={"value": 0},
+        )[0].value
+    except DatabaseError as error:
+        logger.warning("failed to read visitor counter for state: %s", error)
+        return 0
+
+    return _visitor_count_cache
 
 def _increment_counter() -> int:
+    global _visitor_count_cache
+
     with transaction.atomic():
         counter = models.Counter.objects.get_or_create(id=1, defaults={"value": 0})[0]
         counter.value += 1
         counter.save()
+
+    _visitor_count_cache = counter.value
     update_state()
     return counter.value
 
@@ -140,9 +166,7 @@ def state_dict() -> Dict[str, Any]:
     return {
         "partymode": user_manager.partymode_enabled(),
         "users": user_manager.get_count(),
-        "visitors": models.Counter.objects.get_or_create(id=1, defaults={"value": 0})[
-            0
-        ].value,
+        "visitors": _get_visitor_count(),
         "lightsEnabled": redis.get("lights_active"),
         "playbackError": redis.get("playback_error"),
         "alarm": redis.get("alarm_playing"),
