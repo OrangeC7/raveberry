@@ -65,6 +65,10 @@ class MusicProvider:
         requester_ip: str = "",
         requester_session_key: str = "",
     ) -> None:
+        """Enqueues a placeholder if applicable. Playlists have no placeholder, only songs do.
+        Used to identify this resource in the client after a request.
+        """
+        raise NotImplementedError()
 
     def remove_placeholder(self) -> None:
         """Removes the placeholder in the queue that represents this resource.
