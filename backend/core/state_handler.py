@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 STATE_GROUP = "state"
 
-WS_SEND_TIMEOUT_SECONDS = 2.0
+WS_SEND_TIMEOUT_SECONDS = 15.0
 WS_CLOSE_TIMEOUT_SECONDS = 1.0
 
 _state_broadcast_lock = threading.Lock()
@@ -144,6 +144,12 @@ class StateConsumer(AsyncWebsocketConsumer):
                 self.send(text_data=json.dumps(event["state"])),
                 timeout=WS_SEND_TIMEOUT_SECONDS,
             )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "WS SEND TIMED OUT %s [ip=%s]",
+                self.scope.get("path", ""),
+                getattr(self, "client_ip", "") or "",
+            )
         except Exception:  # pylint: disable=broad-except
             logger.warning(
                 "WS SEND FAILED %s [ip=%s]",
@@ -151,7 +157,6 @@ class StateConsumer(AsyncWebsocketConsumer):
                 getattr(self, "client_ip", "") or "",
                 exc_info=True,
             )
-            await self._safe_close()
 
     async def _safe_close(self, code: Optional[int] = None) -> None:
         try:
