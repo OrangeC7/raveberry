@@ -455,17 +455,30 @@ def record_self_remove(request_ip: str, queue_key: int) -> None:
     except RedisError as error:
         logger.warning("failed to record self-remove for %s: %s", normalized, error)
 
-def ip_has_active_queue_slot(request_ip: str) -> bool:
-    """Return whether the given IP currently owns a queued song slot."""
+def get_active_queue_slot(request_ip: str) -> Optional[int]:
+    """Return the active queued-song id owned by this IP, if any."""
     normalized = _normalize_ip(request_ip)
     if not normalized:
-        return False
+        return None
 
     try:
-        return bool(redis.connection.get(_queue_slot_key(normalized)))
+        value = redis.connection.get(_queue_slot_key(normalized))
     except RedisError as error:
-        logger.warning("failed to check queue slot for %s: %s", normalized, error)
-        return False
+        logger.warning("failed to read queue slot for %s: %s", normalized, error)
+        return None
+
+    if not value:
+        return None
+
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def ip_has_active_queue_slot(request_ip: str) -> bool:
+    """Return whether the given IP currently owns a queued song slot."""
+    return get_active_queue_slot(request_ip) is not None
 
 
 def claim_queue_slot(request_ip: str, queue_key: int) -> bool:
