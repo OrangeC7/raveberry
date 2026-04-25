@@ -3,11 +3,11 @@
 import asyncio
 import json
 import logging
-import threading
 from typing import Any, Dict, Optional
 
 from asgiref.sync import async_to_sync
 from channels.db import database_sync_to_async
+from channels.exceptions import StopConsumer
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.layers import get_channel_layer
 from django.core.handlers.wsgi import WSGIRequest
@@ -18,45 +18,31 @@ from core import user_manager
 logger = logging.getLogger(__name__)
 
 STATE_GROUP = "state"
-
-WS_SEND_TIMEOUT_SECONDS = 15.0
+WS_SEND_TIMEOUT_SECONDS = 5.0
 WS_CLOSE_TIMEOUT_SECONDS = 1.0
 
-_state_broadcast_lock = threading.Lock()
 
+def send_state(_state: Dict[str, Any]) -> None:
+    """Notify clients that state changed.
 
-def _broadcast_state(data: Dict[str, Any]) -> None:
-    """Send state without letting a stuck websocket broadcast block callers."""
-    try:
-        channel_layer = get_channel_layer()
-        if channel_layer is None:
-            return
-
-        async_to_sync(channel_layer.group_send)(STATE_GROUP, data)
-    except Exception:  # pylint: disable=broad-except
-        logger.exception("WS STATE BROADCAST FAILED")
-    finally:
-        _state_broadcast_lock.release()
-
-
-def send_state(state: Dict[str, Any]) -> None:
-    """Sends the given dictionary as a state update to all connected clients.
-
-    This intentionally does not block the request / fetch path. A broken websocket
-    should not be able to freeze menu/status requests.
+    Do not send the full state through the websocket. Full state can become large
+    after songs are added, and slow/broken websocket clients can stall the UI.
+    Clients receive this tiny invalidation message and fetch state over HTTP.
     """
-    data = {"type": "state_update", "state": state}
-
-    if not _state_broadcast_lock.acquire(blocking=False):
-        logger.warning("WS STATE BROADCAST SKIPPED because previous broadcast is still running")
+    channel_layer = get_channel_layer()
+    if channel_layer is None:
         return
 
     try:
-        thread = threading.Thread(target=_broadcast_state, args=(data,), daemon=True)
-        thread.start()
+        async_to_sync(channel_layer.group_send)(
+            STATE_GROUP,
+            {
+                "type": "state_update",
+                "state": {"type": "state_dirty"},
+            },
+        )
     except Exception:  # pylint: disable=broad-except
-        _state_broadcast_lock.release()
-        logger.exception("WS STATE BROADCAST THREAD FAILED")
+        logger.warning("WS STATE DIRTY BROADCAST FAILED", exc_info=True)
 
 
 def get_state(_request: WSGIRequest, module) -> JsonResponse:
@@ -86,7 +72,7 @@ class StateConsumer(AsyncWebsocketConsumer):
                     self.client_ip,
                 )
                 await self._safe_close(code=4003)
-                return
+                raise StopConsumer()
 
             logger.info(
                 "WS CONNECT %s [ip=%s]",
@@ -97,13 +83,17 @@ class StateConsumer(AsyncWebsocketConsumer):
             await self.channel_layer.group_add(STATE_GROUP, self.channel_name)
             self._joined_state_group = True
             await self.accept()
+        except StopConsumer:
+            raise
         except Exception:  # pylint: disable=broad-except
-            logger.exception(
+            logger.warning(
                 "WS CONNECT FAILED %s [ip=%s]",
                 self.scope.get("path", ""),
                 self.client_ip or "",
+                exc_info=True,
             )
             await self._safe_close()
+            raise StopConsumer()
 
     async def disconnect(self, code: int) -> None:
         logger.info(
@@ -138,25 +128,21 @@ class StateConsumer(AsyncWebsocketConsumer):
         return
 
     async def state_update(self, event: Dict[str, Any]) -> None:
-        """Receives a message from the room group and sends it back to the websocket."""
+        """Receives a state-change message and sends it to the websocket."""
         try:
             await asyncio.wait_for(
                 self.send(text_data=json.dumps(event["state"])),
                 timeout=WS_SEND_TIMEOUT_SECONDS,
             )
-        except asyncio.TimeoutError:
-            logger.warning(
-                "WS SEND TIMED OUT %s [ip=%s]",
-                self.scope.get("path", ""),
-                getattr(self, "client_ip", "") or "",
-            )
         except Exception:  # pylint: disable=broad-except
             logger.warning(
-                "WS SEND FAILED %s [ip=%s]",
+                "WS SEND FAILED; dropping websocket %s [ip=%s]",
                 self.scope.get("path", ""),
                 getattr(self, "client_ip", "") or "",
                 exc_info=True,
             )
+            await self._safe_close(code=1011)
+            raise StopConsumer()
 
     async def _safe_close(self, code: Optional[int] = None) -> None:
         try:
