@@ -73,7 +73,8 @@ class YoutubeDLLogger:
         logging.error(msg)
 
 
-YTMUSIC_TIMEOUT_SECONDS = 8
+YTMUSIC_TIMEOUT_SECONDS = 25
+YTDLP_SOCKET_TIMEOUT_SECONDS = 30
 
 
 def get_ytmusic() -> ytmusicapi.YTMusic:
@@ -116,10 +117,10 @@ class Youtube:
             "writethumbnail": True,
             "default_search": "auto",
             "postprocessors": postprocessors,
-            "socket_timeout": 8,
-            "retries": 1,
-            "extractor_retries": 1,
-            "fragment_retries": 1,
+            "socket_timeout": YTDLP_SOCKET_TIMEOUT_SECONDS,
+            "retries": 2,
+            "extractor_retries": 2,
+            "fragment_retries": 2,
             "logger": YoutubeDLLogger(),
         }
 
