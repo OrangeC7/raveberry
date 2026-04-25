@@ -130,7 +130,12 @@ class PlaylistProvider(MusicProvider):
         """Fetches the title and list of songs for this playlist from the internet."""
         raise NotImplementedError()
 
-    def enqueue_placeholder(self, manually_requested) -> None:
+    def enqueue_placeholder(
+        self,
+        manually_requested,
+        requester_ip: str = "",
+        requester_session_key: str = "",
+    ) -> None:
         # Playlists have no placeholder representation.
         pass
 
