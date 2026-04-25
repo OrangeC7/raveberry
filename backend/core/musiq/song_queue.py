@@ -37,6 +37,8 @@ class SongQueue(models.Manager):
         manually_requested: bool,
         votes=0,
         enqueue_first=False,
+        requester_ip: str = "",
+        requester_session_key: str = "",
     ) -> QueuedSong:
         """Creates a new song at the end of the queue and returns it."""
         last = self.last()
@@ -51,6 +53,8 @@ class SongQueue(models.Manager):
             internal_url=metadata["internal_url"],
             external_url=metadata["external_url"],
             stream_url=metadata["stream_url"],
+            requester_ip=requester_ip,
+            requester_session_key=requester_session_key,
         )
         if enqueue_first:
             self.prioritize(song.id)
