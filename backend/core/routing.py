@@ -1,9 +1,12 @@
-"""Websocket routes.
+"""Websocket routes."""
 
-State websockets are disabled. The frontend uses HTTP polling for state.
-"""
+from django.urls import re_path
 
-WEBSOCKET_URLPATTERNS = []
+from core.state_handler import StateConsumer
 
-# Backward-compatible alias in case any other code imports the old/lowercase name.
+WEBSOCKET_URLPATTERNS = [
+    re_path(r"state/$", StateConsumer.as_asgi()),
+]
+
+# Backward-compatible alias.
 websocket_urlpatterns = WEBSOCKET_URLPATTERNS
