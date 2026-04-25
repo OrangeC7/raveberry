@@ -1,7 +1,6 @@
-"""This module defines the routing for realtime websocket requests."""
+"""Websocket routes.
 
-from django.urls import path
+State websockets are disabled. The frontend uses HTTP polling for state.
+"""
 
-from core import state_handler
-
-WEBSOCKET_URLPATTERNS = [path("state/", state_handler.StateConsumer.as_asgi())]
+websocket_urlpatterns = []
