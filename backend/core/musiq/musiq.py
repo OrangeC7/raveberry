@@ -135,16 +135,22 @@ def get_providers(
     return providers
 
 
-def try_providers(session_key: str, providers: List[MusicProvider]) -> MusicProvider:
+def try_providers(
+    session_key: str,
+    providers: List[MusicProvider],
+    requester_ip: str = "",
+) -> MusicProvider:
     """Goes through every given provider and tries to request its music.
     Returns the first provider that was successful with an empty error.
-    If unsuccessful, return the last provider."""
+    If unsuccessful, return the last provider.
+    """
     fallback = False
     last_provider = providers[-1]
     provider = providers[0]
+
     for provider in providers:
         try:
-            provider.request(session_key)
+            provider.request(session_key, requester_ip=requester_ip)
             # the current provider could provide the song, don't try the other ones
             break
         except ProviderError:
@@ -182,6 +188,7 @@ def try_providers(session_key: str, providers: List[MusicProvider]) -> MusicProv
 
     if fallback:
         provider.ok_message += " (used fallback)"
+
     return provider
 
 
@@ -220,7 +227,11 @@ def request_music(request: WSGIRequest) -> HttpResponse:
     except ProviderError as error:
         return HttpResponseBadRequest(str(error))
 
-    provider = try_providers(request.session.session_key, providers)
+    provider = try_providers(
+        request.session.session_key or "",
+        providers,
+        requester_ip=requester_ip,
+    )
     if provider.error:
         return HttpResponseBadRequest(provider.error)
 
@@ -234,7 +245,11 @@ def request_music(request: WSGIRequest) -> HttpResponse:
             )
             return HttpResponseBadRequest("No placeholder was created")
         queue_key = queued_song.id
-        user_manager.remember_requester_ip(requester_ip, queue_key)
+        user_manager.remember_requester_ip(
+            requester_ip,
+            queue_key,
+            session_key=request.session.session_key or "",
+        )
 
         if storage.get("ip_checking"):
             assert queue_key
