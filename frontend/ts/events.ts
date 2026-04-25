@@ -1,116 +1,52 @@
-import ReconnectingWebSocket from 'reconnecting-websocket';
-import {updateState, reconnect, getState} from './base.js';
+import {getState, reconnect} from './base.js';
 
-let socketUrl = window.location.host + '/state/';
-if (window.location.protocol == 'https:') {
-  socketUrl = 'wss://' + socketUrl;
-} else {
-  socketUrl = 'ws://' + socketUrl;
-}
-
-const stateSocket = new ReconnectingWebSocket(socketUrl, [], {
-  minReconnectionDelay: 2000 + Math.random() * 1000,
-  maxReconnectionDelay: 10000,
-  reconnectionDelayGrowFactor: 1.5,
-  connectionTimeout: 8000,
-  maxEnqueuedMessages: 0,
-});
+const STATE_POLL_INTERVAL_MS = 2000;
 
 let shuttingDown = false;
-let hideReconnectBannerTimer: number | null = null;
-let pendingStateFetch: number | null = null;
+let pollTimer: number | null = null;
 
-function scheduleStateFetch() {
-  if (shuttingDown || pendingStateFetch !== null) {
+function pollState() {
+  if (shuttingDown || document.hidden) {
     return;
   }
 
-  pendingStateFetch = window.setTimeout(function() {
-    pendingStateFetch = null;
-    getState();
-  }, 250);
+  getState();
 }
 
-function shutdownStateSocket(reason = 'page shutdown') {
-  if (shuttingDown) {
+function startStatePolling() {
+  if (pollTimer !== null) {
     return;
   }
+
+  pollTimer = window.setInterval(pollState, STATE_POLL_INTERVAL_MS);
+}
+
+function stopStatePolling() {
+  if (pollTimer === null) {
+    return;
+  }
+
+  window.clearInterval(pollTimer);
+  pollTimer = null;
+}
+
+function shutdownStatePolling() {
   shuttingDown = true;
-
-  if (hideReconnectBannerTimer !== null) {
-    window.clearTimeout(hideReconnectBannerTimer);
-    hideReconnectBannerTimer = null;
-  }
-
-  if (pendingStateFetch !== null) {
-    window.clearTimeout(pendingStateFetch);
-    pendingStateFetch = null;
-  }
-
-  try {
-    // reconnecting-websocket supports a third options arg at runtime.
-    // keepClosed=true is the important part: do not reconnect while unloading.
-    (stateSocket as any).close(1000, reason, {keepClosed: true, fastClose: true});
-  } catch (_err) {
-    try {
-      stateSocket.close(1000, reason);
-    } catch (_err2) {
-      // ignore
-    }
-  }
+  stopStatePolling();
 }
 
-stateSocket.addEventListener('message', (e) => {
+document.addEventListener('visibilitychange', () => {
   if (shuttingDown) {
     return;
   }
 
-  let message = null;
-  try {
-    message = JSON.parse(e.data);
-  } catch (_err) {
-    scheduleStateFetch();
+  if (document.hidden) {
+    stopStatePolling();
     return;
   }
 
-  if (message && message.type === 'state_dirty') {
-    scheduleStateFetch();
-    return;
-  }
-
-  // Backward compatible with older backend messages that still contain full state.
-  updateState(message);
-});
-
-let firstConnect = true;
-
-stateSocket.addEventListener('open', () => {
-  if (shuttingDown) {
-    shutdownStateSocket('shutdown-after-open');
-    return;
-  }
-
-  if (!firstConnect) {
-    reconnect();
-    $('#disconnected-banner').slideUp('fast');
-    $('#reconnected-banner').slideDown('fast');
-
-    if (hideReconnectBannerTimer !== null) {
-      window.clearTimeout(hideReconnectBannerTimer);
-    }
-
-    hideReconnectBannerTimer = window.setTimeout(function() {
-      $('#reconnected-banner').slideUp('fast');
-    }, 2000);
-  }
-  firstConnect = false;
-});
-
-stateSocket.addEventListener('close', () => {
-  if (shuttingDown) {
-    return;
-  }
-  $('#disconnected-banner').slideDown('fast');
+  reconnect();
+  startStatePolling();
 });
 
 window.addEventListener('message', (event) => {
@@ -119,14 +55,17 @@ window.addEventListener('message', (event) => {
   }
 
   if (event.data && event.data.type === 'furatic:shutdown-state-socket') {
-    shutdownStateSocket('parent-mode-switch');
+    shutdownStatePolling();
   }
 });
 
 addEventListener('pagehide', () => {
-  shutdownStateSocket('pagehide');
+  shutdownStatePolling();
 }, {capture: true});
 
 addEventListener('beforeunload', () => {
-  shutdownStateSocket('beforeunload');
+  shutdownStatePolling();
 }, {capture: true});
+
+reconnect();
+startStatePolling();
