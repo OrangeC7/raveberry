@@ -5,6 +5,8 @@ import logging
 
 from core import audit_log, ip_screening, site_mode, user_manager
 
+from django.db import close_old_connections, connections
+
 logger = logging.getLogger(__name__)
 
 _BAN_ALWAYS_ALLOWED_PREFIXES = (
@@ -63,6 +65,22 @@ def _ban_response(reason: str = "") -> HttpResponse:
 
     return HttpResponse(message, status=403)
 
+class DatabaseConnectionCleanupMiddleware:
+    """Close per-request DB connections aggressively.
+
+    This app uses frequent polling endpoints. In ASGI/debug mode, letting
+    request threads keep DB connections around can exhaust PostgreSQL slots.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        close_old_connections()
+        try:
+            return self.get_response(request)
+        finally:
+            connections.close_all()
 
 class ClientIpBanMiddleware:
     """Resolve the real client IP, log requests, and block banned traffic."""
