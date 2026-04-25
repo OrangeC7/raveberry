@@ -216,10 +216,24 @@ export function updateState(newState) {
   }
 }
 
+let stateRequestInFlight = false;
+
 /** Requests a state update from the server and applies it. */
 export function getState() {
-  $.get(urls['state'], function(state) {
+  if (stateRequestInFlight) {
+    return;
+  }
+
+  stateRequestInFlight = true;
+
+  $.ajax({
+    url: urls['state'],
+    method: 'GET',
+    timeout: 8000,
+  }).done(function(state) {
     updateState(state);
+  }).always(function() {
+    stateRequestInFlight = false;
   });
 }
 
