@@ -59,10 +59,12 @@ class MusicProvider:
         """Returns whether this resource is available online."""
         raise NotImplementedError()
 
-    def enqueue_placeholder(self, manually_requested) -> None:
-        """Enqueues a placeholder if applicable. Playlists have no placeholder, only songs do.
-        Used to identify this resource in the client after a request."""
-        raise NotImplementedError()
+    def enqueue_placeholder(
+        self,
+        manually_requested,
+        requester_ip: str = "",
+        requester_session_key: str = "",
+    ) -> None:
 
     def remove_placeholder(self) -> None:
         """Removes the placeholder in the queue that represents this resource.
@@ -97,7 +99,11 @@ class MusicProvider:
         raise NotImplementedError()
 
     def request(
-        self, session_key: str, archive: bool = True, manually_requested: bool = True
+        self,
+        session_key: str,
+        archive: bool = True,
+        manually_requested: bool = True,
+        requester_ip: str = "",
     ) -> None:
         """Tries to request this resource.
         Uses the local cache if possible, otherwise tries to retrieve it online."""
@@ -127,7 +133,11 @@ class MusicProvider:
             if self.on_cooldown():
                 raise ProviderError(self.error)
 
-        self.enqueue_placeholder(manually_requested)
+        self.enqueue_placeholder(
+            manually_requested,
+            requester_ip=requester_ip,
+            requester_session_key=session_key if manually_requested else "",
+        )
 
         enqueue_function.delay(self, session_key, archive)
 
