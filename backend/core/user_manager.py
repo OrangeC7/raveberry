@@ -892,12 +892,15 @@ def tracked(
             else:
                 leds.disable_act_led()
 
-        redis.connection.incr("active_requests")
-        check()
-        response = func(request)
-        redis.connection.decr("active_requests")
-        check()
-
-        return response
+        try:
+            redis.connection.incr("active_requests")
+            check()
+            return func(request)
+        finally:
+            try:
+                redis.connection.decr("active_requests")
+                check()
+            except RedisError as error:
+                logger.warning("failed to finish tracked request cleanup: %s", error)
 
     return wraps(func)(_decorator)
