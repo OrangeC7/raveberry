@@ -264,6 +264,8 @@ class Playback:
             artist=song.artist,
             title=song.title,
             duration=song.duration,
+            requester_ip=song.requester_ip,
+            requester_session_key=song.requester_session_key,
         )
 
         handle_autoplay()
