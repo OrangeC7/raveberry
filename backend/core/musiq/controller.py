@@ -296,33 +296,44 @@ def remove_own_song(request: WSGIRequest) -> HttpResponse:
 
 
 def own_song_state(request: WSGIRequest) -> HttpResponse:
-    """Return the current requester's queued song and current-song ownership.
+    """Return the current requester's queued songs and current song ownership.
 
-    Keep this endpoint cheap. It is polled by every connected client, so it must
-    not scan Redis once per queue entry.
+    Redis is used as a fast path, but requester identity is also stored on the
+    queue/current song rows so tab sleep, Redis misses, or reconnects do not
+    make the app forget who owns a song.
     """
     request_ip = user_manager.get_client_ip(request)
+    normalized_ip = user_manager.normalize_ip(request_ip)
     songs = []
 
     active_queue_key = user_manager.get_active_queue_slot(request_ip)
 
-    if active_queue_key is not None:
-        for position, song in enumerate(musiq.ordered_queue_queryset(), start=1):
-            if song.id == active_queue_key:
-                songs.append(
-                    {
-                        "queueKey": song.id,
-                        "queuePosition": position,
-                    }
-                )
-                break
+    for position, song in enumerate(musiq.ordered_queue_queryset(), start=1):
+        owns_song = False
+
+        if active_queue_key is not None and song.id == active_queue_key:
+            owns_song = True
+
+        if not owns_song and normalized_ip and song.requester_ip == normalized_ip:
+            owns_song = True
+
+        if owns_song:
+            songs.append(
+                {
+                    "queueKey": song.id,
+                    "queuePosition": position,
+                }
+            )
 
     current_song_queue_key = None
     current_song = models.CurrentSong.objects.first()
     if (
         current_song
-        and user_manager.get_song_requester_ip(current_song.queue_key)
-        == user_manager._normalize_ip(request_ip)  # pylint: disable=protected-access
+        and normalized_ip
+        and (
+            current_song.requester_ip == normalized_ip
+            or user_manager.song_belongs_to_ip(request_ip, current_song.queue_key)
+        )
     ):
         current_song_queue_key = current_song.queue_key
 
