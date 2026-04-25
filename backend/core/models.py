@@ -165,6 +165,8 @@ class QueuedSong(models.Model):
     artist = models.CharField(max_length=1000)
     title = models.CharField(max_length=1000)
     duration = models.FloatField()
+    requester_ip = models.CharField(max_length=45, blank=True, default="")
+    requester_session_key = models.CharField(max_length=50, blank=True, default="")
     objects = song_queue.SongQueue()
 
     def __str__(self) -> str:
@@ -190,6 +192,8 @@ class CurrentSong(models.Model):
     internal_url = models.CharField(max_length=2000)
     external_url = models.CharField(max_length=2000)
     stream_url = models.CharField(max_length=2000, blank=True, null=True)
+    requester_ip = models.CharField(max_length=45, blank=True, default="")
+    requester_session_key = models.CharField(max_length=50, blank=True, default="")
     created = models.DateTimeField(auto_now_add=True)
     last_paused = models.DateTimeField(auto_now_add=True)
 
