@@ -4,15 +4,7 @@
 
 We checked whether 404 pages exposed Django debug information:
 
-```bash
-echo "=== DJANGO DEBUG SIGNATURE CHECK ==="
-
-grep -RInE \
-  "Django tried these URL patterns|Using the URLconf|settings\.DEBUG|Traceback|Exception Type|Exception Value|Request Method|Request URL|Python Executable|Python Path|Server time|INSTALLED_APPS|MIDDLEWARE|DATABASES|SECRET_KEY" \
-  /tmp/furatic-event-test || echo "No Django debug signatures found."
-```
-
-This did find Django technical 404 output. For example:
+This did find Django technical 404 output:
 
 ```text
 Using the URLconf defined in <code>main.urls</code>,
